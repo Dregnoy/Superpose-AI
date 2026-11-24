@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>tr</string>
+	<key>CFBundleDisplayName</key>
+	<string>BluePad</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>LSRequiresIPhoneOS</key>
+	<true/>
+	<key>NSBluetoothAlwaysUsageDescription</key>
+	<string>BluePad, iPhone veya iPad'inizi bilgisayar, tablet veya akıllı TV için kablosuz Bluetooth klavye, trackpad ve kumanda olarak yayınlamak için Bluetooth erişimi kullanır.</string>
+	<key>NSBluetoothPeripheralUsageDescription</key>
+	<string>BluePad, yakınınızdaki cihazların sizi standart bir Bluetooth HID klavye ve fare olarak görebilmesi için Bluetooth çevre birimi modunu kullanır.</string>
+	<key>NSCameraUsageDescription</key>
+	<string>BluePad, QR kodları ve barkodları tarayıp bağlı cihaza anında metin olarak yazmak için kamerayı kullanır.</string>
+	<key>NSMicrophoneUsageDescription</key>
+	<string>BluePad, sesle yazma (dikte) özelliğinde konuşmalarınızı bağlı cihaza klavye girdisi olarak aktarmak için mikrofonu kullanır.</string>
+	<key>NSSpeechRecognitionUsageDescription</key>
+	<string>BluePad, konuşmalarınızı metne çevirip bağlı cihaza yazmak için Apple Konuşma Tanıma servisini kullanır.</string>
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>bluetooth-peripheral</string>
+	</array>
+	<key>UILaunchScreen</key>
+	<dict>
+		<key>UIColorName</key>
+		<string>AccentColor</string>
+	</dict>
+	<key>UIRequiredDeviceCapabilities</key>
+	<array>
+		<string>arm64</string>
+	</array>
+	<key>UISupportedInterfaceOrientations</key>
+	<array>
+		<string>UIInterfaceOrientationPortrait</string>
+		<string>UIInterfaceOrientationLandscapeLeft</string>
+		<string>UIInterfaceOrientationLandscapeRight</string>
+	</array>
+	<key>UIUserInterfaceStyle</key>
+	<string>Dark</string>
+</dict>
+</plist>
