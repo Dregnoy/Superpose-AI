@@ -1,0 +1,120 @@
+name: Build & Test BluePad iOS
+
+on:
+  push:
+    branches: [ main, master ]
+  workflow_dispatch:
+
+jobs:
+  build-and-test:
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Detect project directory
+        id: proj
+        run: |
+          if [ -f "project.yml" ]; then
+            echo "dir=." >> "$GITHUB_OUTPUT"
+          elif [ -f "bluepad-ios/project.yml" ]; then
+            echo "dir=bluepad-ios" >> "$GITHUB_OUTPUT"
+          else
+            echo "::error::bluepad-ios/project.yml veya project.yml bulunamadi!"
+            ls -la
+            exit 1
+          fi
+
+      - name: Select Xcode
+        run: |
+          sudo xcode-select -s /Applications/Xcode.app/Contents/Developer
+          xcodebuild -version
+
+      - name: Install XcodeGen
+        run: |
+          if ! command -v xcodegen >/dev/null 2>&1; then
+            brew install xcodegen
+          fi
+
+      - name: Generate Xcode project
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: xcodegen generate
+
+      - name: Pick available iOS Simulator destination
+        id: sim
+        run: |
+          SIM_ID=$(xcrun simctl list devices available -j | python3 -c '
+          import json, sys
+          data = json.load(sys.stdin)
+          best = None
+          for rt, devs in sorted(data.get("devices", {}).items(), reverse=True):
+              if "iOS" not in rt:
+                  continue
+              for d in devs:
+                  if d.get("isAvailable") and "iPhone" in d.get("name", ""):
+                      best = (d["udid"], d["name"])
+                      break
+              if best:
+                  break
+          if best:
+              print(best[0])
+          ')
+          if [ -z "$SIM_ID" ]; then
+            echo "::error::Kullanilabilir iOS Simulator bulunamadi."
+            xcrun simctl list runtimes available
+            exit 1
+          fi
+          echo "Picked simulator UDID: $SIM_ID"
+          echo "udid=$SIM_ID" >> "$GITHUB_OUTPUT"
+
+      - name: Run BluePadTests on iOS Simulator
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: |
+          set -o pipefail
+          if ! xcodebuild test \
+            -project BluePad.xcodeproj \
+            -scheme BluePad \
+            -configuration Debug \
+            -destination "platform=iOS Simulator,id=${{ steps.sim.outputs.udid }}" \
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee xcodebuild_test.log; then
+            grep -E "error:|fatal error:|FAIL|\*\* TEST FAILED \*\*" xcodebuild_test.log | tail -n 30 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 65
+          fi
+
+      - name: Build unsigned Release iphoneos app
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: |
+          set -o pipefail
+          if ! xcodebuild clean build \
+            -project BluePad.xcodeproj \
+            -scheme BluePad \
+            -configuration Release \
+            -sdk iphoneos \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" 2>&1 | tee xcodebuild_release.log; then
+            grep -E "error:|fatal error:|\*\* BUILD FAILED \*\*" xcodebuild_release.log | tail -n 30 | while IFS= read -r line; do
+              echo "::error::$line"
+            done
+            exit 65
+          fi
+
+      - name: Package unsigned BluePad.ipa
+        working-directory: ${{ steps.proj.outputs.dir }}
+        run: |
+          mkdir -p out/Payload
+          cp -R build/Build/Products/Release-iphoneos/BluePad.app out/Payload/BluePad.app
+          cd out
+          zip -qry ../BluePad.ipa Payload
+          ls -lh ../BluePad.ipa
+
+      - name: Upload unsigned BluePad.ipa artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: BluePad-Unsigned-IPA
+          path: ${{ steps.proj.outputs.dir }}/BluePad.ipa
+          if-no-files-found: error
