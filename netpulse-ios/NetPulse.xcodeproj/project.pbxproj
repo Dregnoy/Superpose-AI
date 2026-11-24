@@ -1,0 +1,420 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		NPB001000000000000000001 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000001 /* AppViewModel.swift */; };
+		NPB001000000000000000002 /* NetPulseApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000002 /* NetPulseApp.swift */; };
+		NPB001000000000000000003 /* NetworkModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000003 /* NetworkModels.swift */; };
+		NPB001000000000000000004 /* AirTiesModemClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000004 /* AirTiesModemClient.swift */; };
+		NPB001000000000000000005 /* BufferbloatService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000005 /* BufferbloatService.swift */; };
+		NPB001000000000000000006 /* DiagnosisEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000006 /* DiagnosisEngine.swift */; };
+		NPB001000000000000000007 /* DnsProbeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000007 /* DnsProbeService.swift */; };
+		NPB001000000000000000008 /* KeychainVault.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000008 /* KeychainVault.swift */; };
+		NPB001000000000000000009 /* LatencyProbeService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000009 /* LatencyProbeService.swift */; };
+		NPB00100000000000000000A /* NetworkPathService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF00100000000000000000A /* NetworkPathService.swift */; };
+		NPB00100000000000000000B /* ReportGenerator.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF00100000000000000000B /* ReportGenerator.swift */; };
+		NPB00100000000000000000C /* StorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF00100000000000000000C /* StorageService.swift */; };
+		NPB00100000000000000000D /* UpnpWanService.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF00100000000000000000D /* UpnpWanService.swift */; };
+		NPB00100000000000000000E /* ModemControlView.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF00100000000000000000E /* ModemControlView.swift */; };
+		NPB00100000000000000000F /* ReportsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF00100000000000000000F /* ReportsView.swift */; };
+		NPB001000000000000000010 /* SummaryView.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000010 /* SummaryView.swift */; };
+		NPB001000000000000000011 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000011 /* Theme.swift */; };
+		NPB001000000000000000012 /* ToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF001000000000000000012 /* ToolsView.swift */; };
+		NPB002000000000000000013 /* NetPulseCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = NPF002000000000000000013 /* NetPulseCoreTests.swift */; };
+		NPA002000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = NPA001000000000000000001 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		NPE010000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = NPE000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = NPE001000000000000000001;
+			remoteInfo = NetPulse;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		NPF001000000000000000001 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AppViewModel.swift"; path = "NetPulse/App/AppViewModel.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000002 /* NetPulseApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "NetPulseApp.swift"; path = "NetPulse/App/NetPulseApp.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000003 /* NetworkModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "NetworkModels.swift"; path = "NetPulse/Models/NetworkModels.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000004 /* AirTiesModemClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AirTiesModemClient.swift"; path = "NetPulse/Services/AirTiesModemClient.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000005 /* BufferbloatService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "BufferbloatService.swift"; path = "NetPulse/Services/BufferbloatService.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000006 /* DiagnosisEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DiagnosisEngine.swift"; path = "NetPulse/Services/DiagnosisEngine.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000007 /* DnsProbeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "DnsProbeService.swift"; path = "NetPulse/Services/DnsProbeService.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000008 /* KeychainVault.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "KeychainVault.swift"; path = "NetPulse/Services/KeychainVault.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000009 /* LatencyProbeService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "LatencyProbeService.swift"; path = "NetPulse/Services/LatencyProbeService.swift"; sourceTree = SOURCE_ROOT; };
+		NPF00100000000000000000A /* NetworkPathService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "NetworkPathService.swift"; path = "NetPulse/Services/NetworkPathService.swift"; sourceTree = SOURCE_ROOT; };
+		NPF00100000000000000000B /* ReportGenerator.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ReportGenerator.swift"; path = "NetPulse/Services/ReportGenerator.swift"; sourceTree = SOURCE_ROOT; };
+		NPF00100000000000000000C /* StorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "StorageService.swift"; path = "NetPulse/Services/StorageService.swift"; sourceTree = SOURCE_ROOT; };
+		NPF00100000000000000000D /* UpnpWanService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "UpnpWanService.swift"; path = "NetPulse/Services/UpnpWanService.swift"; sourceTree = SOURCE_ROOT; };
+		NPF00100000000000000000E /* ModemControlView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ModemControlView.swift"; path = "NetPulse/Views/ModemControlView.swift"; sourceTree = SOURCE_ROOT; };
+		NPF00100000000000000000F /* ReportsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ReportsView.swift"; path = "NetPulse/Views/ReportsView.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000010 /* SummaryView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "SummaryView.swift"; path = "NetPulse/Views/SummaryView.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000011 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Theme.swift"; path = "NetPulse/Views/Theme.swift"; sourceTree = SOURCE_ROOT; };
+		NPF001000000000000000012 /* ToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ToolsView.swift"; path = "NetPulse/Views/ToolsView.swift"; sourceTree = SOURCE_ROOT; };
+		NPF002000000000000000013 /* NetPulseCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "NetPulseCoreTests.swift"; path = "NetPulseTests/NetPulseCoreTests.swift"; sourceTree = SOURCE_ROOT; };
+		NPA001000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = "Assets.xcassets"; path = "NetPulse/Resources/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
+		NPA003000000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info.plist"; path = "NetPulse/Resources/Info.plist"; sourceTree = SOURCE_ROOT; };
+		NPA004000000000000000001 /* NetPulse.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = NetPulse.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		NPA005000000000000000001 /* NetPulseTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = NetPulseTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		NPD001000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		NPD002000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		NPC000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				NPC000000000000000000002 /* NetPulse */,
+				NPC001000000000000000006 /* NetPulseTests */,
+				NPC000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		NPC000000000000000000002 /* NetPulse */ = {
+			isa = PBXGroup;
+			children = (
+				NPC001000000000000000001 /* App */,
+				NPC001000000000000000002 /* Models */,
+				NPC001000000000000000003 /* Services */,
+				NPC001000000000000000004 /* Views */,
+				NPC001000000000000000005 /* Resources */,
+			);
+			name = NetPulse;
+			sourceTree = "<group>";
+		};
+		NPC001000000000000000001 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				NPF001000000000000000001 /* AppViewModel.swift */,
+				NPF001000000000000000002 /* NetPulseApp.swift */,
+			);
+			name = App;
+			sourceTree = "<group>";
+		};
+		NPC001000000000000000002 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				NPF001000000000000000003 /* NetworkModels.swift */,
+			);
+			name = Models;
+			sourceTree = "<group>";
+		};
+		NPC001000000000000000003 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				NPF001000000000000000004 /* AirTiesModemClient.swift */,
+				NPF001000000000000000005 /* BufferbloatService.swift */,
+				NPF001000000000000000006 /* DiagnosisEngine.swift */,
+				NPF001000000000000000007 /* DnsProbeService.swift */,
+				NPF001000000000000000008 /* KeychainVault.swift */,
+				NPF001000000000000000009 /* LatencyProbeService.swift */,
+				NPF00100000000000000000A /* NetworkPathService.swift */,
+				NPF00100000000000000000B /* ReportGenerator.swift */,
+				NPF00100000000000000000C /* StorageService.swift */,
+				NPF00100000000000000000D /* UpnpWanService.swift */,
+			);
+			name = Services;
+			sourceTree = "<group>";
+		};
+		NPC001000000000000000004 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				NPF00100000000000000000E /* ModemControlView.swift */,
+				NPF00100000000000000000F /* ReportsView.swift */,
+				NPF001000000000000000010 /* SummaryView.swift */,
+				NPF001000000000000000011 /* Theme.swift */,
+				NPF001000000000000000012 /* ToolsView.swift */,
+			);
+			name = Views;
+			sourceTree = "<group>";
+		};
+		NPC001000000000000000005 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				NPA001000000000000000001 /* Assets.xcassets */,
+				NPA003000000000000000001 /* Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		NPC001000000000000000006 /* NetPulseTests */ = {
+			isa = PBXGroup;
+			children = (
+				NPF002000000000000000013 /* NetPulseCoreTests.swift */,
+			);
+			name = NetPulseTests;
+			sourceTree = "<group>";
+		};
+		NPC000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				NPA004000000000000000001 /* NetPulse.app */,
+				NPA005000000000000000001 /* NetPulseTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		NPE001000000000000000001 /* NetPulse */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = NPF200000000000000000001 /* Build configuration list for PBXNativeTarget "NetPulse" */;
+			buildPhases = (
+				NPD001000000000000000001 /* Sources */,
+				NPD001000000000000000002 /* Resources */,
+				NPD001000000000000000003 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = NetPulse;
+			productName = NetPulse;
+			productReference = NPA004000000000000000001 /* NetPulse.app */;
+			productType = "com.apple.product-type.application";
+		};
+		NPE002000000000000000001 /* NetPulseTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = NPF300000000000000000001 /* Build configuration list for PBXNativeTarget "NetPulseTests" */;
+			buildPhases = (
+				NPD002000000000000000001 /* Sources */,
+				NPD002000000000000000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				NPE011000000000000000001 /* PBXTargetDependency */,
+			);
+			name = NetPulseTests;
+			productName = NetPulseTests;
+			productReference = NPA005000000000000000001 /* NetPulseTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		NPE000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = NPF100000000000000000001 /* Build configuration list for PBXProject "NetPulse" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = tr;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				tr,
+				en,
+				Base,
+			);
+			mainGroup = NPC000000000000000000001;
+			productRefGroup = NPC000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				NPE001000000000000000001 /* NetPulse */,
+				NPE002000000000000000001 /* NetPulseTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		NPD001000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				NPA002000000000000000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		NPD001000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				NPB001000000000000000001 /* AppViewModel.swift */,
+				NPB001000000000000000002 /* NetPulseApp.swift */,
+				NPB001000000000000000003 /* NetworkModels.swift */,
+				NPB001000000000000000004 /* AirTiesModemClient.swift */,
+				NPB001000000000000000005 /* BufferbloatService.swift */,
+				NPB001000000000000000006 /* DiagnosisEngine.swift */,
+				NPB001000000000000000007 /* DnsProbeService.swift */,
+				NPB001000000000000000008 /* KeychainVault.swift */,
+				NPB001000000000000000009 /* LatencyProbeService.swift */,
+				NPB00100000000000000000A /* NetworkPathService.swift */,
+				NPB00100000000000000000B /* ReportGenerator.swift */,
+				NPB00100000000000000000C /* StorageService.swift */,
+				NPB00100000000000000000D /* UpnpWanService.swift */,
+				NPB00100000000000000000E /* ModemControlView.swift */,
+				NPB00100000000000000000F /* ReportsView.swift */,
+				NPB001000000000000000010 /* SummaryView.swift */,
+				NPB001000000000000000011 /* Theme.swift */,
+				NPB001000000000000000012 /* ToolsView.swift */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		NPD002000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				NPB002000000000000000013 /* NetPulseCoreTests.swift */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		NPE011000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = NPE001000000000000000001 /* NetPulse */;
+			targetProxy = NPE010000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		NPF101000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		NPF102000000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		NPF201000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = NetPulse/Resources/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.netpulse.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+			};
+			name = Debug;
+		};
+		NPF202000000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = NetPulse/Resources/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.netpulse.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+			};
+			name = Release;
+		};
+		NPF301000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.netpulse.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NetPulse.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/NetPulse";
+			};
+			name = Debug;
+		};
+		NPF302000000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.netpulse.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/NetPulse.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/NetPulse";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		NPF100000000000000000001 /* Build configuration list for PBXProject "NetPulse" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				NPF101000000000000000001 /* Debug */,
+				NPF102000000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		NPF200000000000000000001 /* Build configuration list for PBXNativeTarget "NetPulse" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				NPF201000000000000000001 /* Debug */,
+				NPF202000000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		NPF300000000000000000001 /* Build configuration list for PBXNativeTarget "NetPulseTests" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				NPF301000000000000000001 /* Debug */,
+				NPF302000000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = NPE000000000000000000001 /* Project object */;
+}
