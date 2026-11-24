@@ -134,8 +134,9 @@ final class NetworkPathService: @unchecked Sendable {
             let lower = iface.name.lowercased()
             return lower.hasPrefix("utun") || lower.hasPrefix("ppp") || lower.hasPrefix("ipsec") || iface.type == .other
         }
-        let lan = (kind == .wifi || kind == .wired) ? LocalNetworkHelper.detectLocalIPv4AndGateway() : (nil, nil)
-
+               let lan: (localIP: String?, gatewayIP: String?) = (kind == .wifi || kind == .wired)
+            ? LocalNetworkHelper.detectLocalIPv4AndGateway()
+            : (localIP: nil, gatewayIP: nil)
         return NetworkPathSnapshot(
             connectionType: kind,
             isConnected: path.status == .satisfied,
