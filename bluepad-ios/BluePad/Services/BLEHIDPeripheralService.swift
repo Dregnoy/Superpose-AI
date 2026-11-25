@@ -67,11 +67,13 @@ final class BLEHIDPeripheralService: NSObject {
     private var mouseInputChar: CBMutableCharacteristic!
     private var consumerInputChar: CBMutableCharacteristic!
     private var systemInputChar: CBMutableCharacteristic!
+    private var gamepadInputChar: CBMutableCharacteristic!
 
     // MARK: Subscriptions & TX Backpressure
     private var subscriptionsByCharacteristic: [ObjectIdentifier: Set<UUID>] = [:]
     private var reliableQueue: [(characteristic: CBMutableCharacteristic, payload: Data)] = []
     private var pendingMouse = PendingMouseAccumulator()
+    private var pendingGamepad: Data?
     private let maxReliableQueueDepth = 256
 
     // MARK: Lifecycle
@@ -426,11 +428,13 @@ final class BLEHIDPeripheralService: NSObject {
         let emptyBootMouse = HIDReportBuilder.bootMouseReport()
         let emptyConsumer = HIDReportBuilder.consumerReport(usage: 0)
         let emptySystem = HIDReportBuilder.systemReport(usage: [])
+        let emptyGamepad = HIDReportBuilder.gamepadReport()
 
         runOnMain { [weak self] in
             guard let self else { return }
             self.currentMouseButtons = []
             self.pendingMouse.clear()
+            self.pendingGamepad = nil
             if let kb = self.activeKeyboardInputCharacteristic() {
                 self.enqueueReliable(emptyKeyboard, on: kb, label: "Klavye Sıfırla")
             }
@@ -443,6 +447,26 @@ final class BLEHIDPeripheralService: NSObject {
             }
             if let sys = self.systemInputChar {
                 self.enqueueReliable(emptySystem, on: sys, label: "Sistem Sıfırla")
+            }
+            if let gamepad = self.gamepadInputChar {
+                self.enqueueReliable(emptyGamepad, on: gamepad, label: "Gamepad Sıfırla")
+            }
+        }
+    }
+
+    func sendGamepad(_ state: HIDGamepadState) {
+        let payload = HIDReportBuilder.gamepadReport(state)
+        runOnMain { [weak self] in
+            guard let self,
+                  let char = self.gamepadInputChar,
+                  let manager = self.peripheralManager,
+                  manager.state == .poweredOn,
+                  self.hasSubscribers(for: char) else { return }
+            if manager.updateValue(payload, for: char, onSubscribedCentrals: nil) {
+                self.pendingGamepad = nil
+                self.notifyPacketSent()
+            } else {
+                self.pendingGamepad = payload
             }
         }
     }
@@ -637,6 +661,10 @@ final class BLEHIDPeripheralService: NSObject {
             reportID: HIDReportMap.systemReportID,
             isOutput: false
         )
+        gamepadInputChar = makeReportCharacteristic(
+            reportID: HIDReportMap.gamepadReportID,
+            isOutput: false
+        )
 
         let hidService = CBMutableService(type: HOGPUUID.hidService, primary: true)
         if let battery {
@@ -654,7 +682,8 @@ final class BLEHIDPeripheralService: NSObject {
             keyboardOutputChar,
             mouseInputChar,
             consumerInputChar,
-            systemInputChar
+            systemInputChar,
+            gamepadInputChar
         ]
         return hidService
     }
@@ -863,6 +892,17 @@ final class BLEHIDPeripheralService: NSObject {
         } else {
             pendingMouse.clear()
         }
+
+        if let gamepadChar = gamepadInputChar, hasSubscribers(for: gamepadChar) {
+            if let packet = pendingGamepad {
+                if manager.updateValue(packet, for: gamepadChar, onSubscribedCentrals: nil) {
+                    pendingGamepad = nil
+                    notifyPacketSent()
+                }
+            }
+        } else {
+            pendingGamepad = nil
+        }
     }
 
     private func baselineReport(for characteristic: CBCharacteristic) -> Data? {
@@ -880,6 +920,9 @@ final class BLEHIDPeripheralService: NSObject {
         }
         if characteristic === systemInputChar {
             return HIDReportBuilder.systemReport(usage: [])
+        }
+        if characteristic === gamepadInputChar {
+            return HIDReportBuilder.gamepadReport()
         }
         if characteristic === batteryLevelChar {
             return Data([currentBatteryLevel])
@@ -1354,6 +1397,8 @@ extension BLEHIDPeripheralService: CBCentralManagerDelegate {
             .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let periphName = peripheral.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
         let existing = discoveredHosts[peripheral.identifier]
+        let mfgData = advertisementData[CBAdvertisementDataManufacturerDataKey] as? Data
+        let mfgName = mfgData.flatMap { BLECompanyDirectory.companyName(from: $0) } ?? existing?.manufacturerName
 
         let resolvedName: String
         let hasName: Bool
@@ -1368,7 +1413,11 @@ extension BLEHIDPeripheralService: CBCentralManagerDelegate {
             hasName = true
         } else {
             let shortID = String(peripheral.identifier.uuidString.prefix(8))
-            resolvedName = "Bilinmeyen BLE (\(shortID))"
+            if let mfgName {
+                resolvedName = "\(mfgName) Cihazı (\(shortID))"
+            } else {
+                resolvedName = "Bilinmeyen BLE (\(shortID))"
+            }
             hasName = false
         }
 
@@ -1381,6 +1430,7 @@ extension BLEHIDPeripheralService: CBCentralManagerDelegate {
             rssi: rssiValue,
             isConnectable: isConnectable,
             isSystemConnected: existing?.isSystemConnected ?? false,
+            manufacturerName: mfgName,
             linkState: existing?.linkState ?? .discovered,
             lastSeen: Date()
         )
@@ -1388,6 +1438,9 @@ extension BLEHIDPeripheralService: CBCentralManagerDelegate {
     }
 
     func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        peripheral.delegate = self
+        peripheral.discoverServices(nil)
+
         let hostName = discoveredHosts[peripheral.identifier]?.name
             ?? peripheral.name
             ?? "BLE Cihazı"
@@ -1403,6 +1456,7 @@ extension BLEHIDPeripheralService: CBCentralManagerDelegate {
                 rssi: -50,
                 isConnectable: true,
                 isSystemConnected: true,
+                manufacturerName: nil,
                 linkState: .connected,
                 lastSeen: Date()
             )
@@ -1443,5 +1497,21 @@ extension BLEHIDPeripheralService: CBCentralManagerDelegate {
         } else {
             emitLog(.ble, "Hedef cihaz bağlantısı kesildi (\(hostName)).")
         }
+    }
+}
+
+// MARK: - CBPeripheralDelegate (GAP Name Refresh)
+
+extension BLEHIDPeripheralService: CBPeripheralDelegate {
+
+    func peripheralDidUpdateName(_ peripheral: CBPeripheral) {
+        let clean = peripheral.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        guard !clean.isEmpty, var host = discoveredHosts[peripheral.identifier] else { return }
+        host.name = clean
+        host.hasExplicitName = true
+        host.lastSeen = Date()
+        discoveredHosts[peripheral.identifier] = host
+        emitDiscoveredHosts(force: true)
+        emitLog(.ble, "Hedef cihaz adı güncellendi: \(clean)")
     }
 }

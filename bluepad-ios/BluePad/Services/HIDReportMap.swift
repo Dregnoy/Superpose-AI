@@ -6,11 +6,13 @@ import Foundation
 /// - Report ID 2: 5-Button Relative Mouse + Vertical & Horizontal Wheel (5-byte Input)
 /// - Report ID 3: Consumer Control Multimedia Keys (2-byte LE Input)
 /// - Report ID 4: Generic Desktop System Control (1-byte Input)
+/// - Report ID 5: Gamepad (16 Buttons + 8-Way Hat + Dual Analog Sticks, 7-byte Input)
 enum HIDReportMap {
     static let keyboardReportID: UInt8 = 1
     static let mouseReportID: UInt8    = 2
     static let consumerReportID: UInt8 = 3
     static let systemReportID: UInt8   = 4
+    static let gamepadReportID: UInt8  = 5
 
     static let descriptorBytes: [UInt8] = [
         // -----------------------------------------------------------------
@@ -123,6 +125,46 @@ enum HIDReportMap {
         0x75, 0x05,       //   Report Size (5)
         0x95, 0x01,       //   Report Count (1)
         0x81, 0x03,       //   Input (Const, Var, Abs)
+        0xC0,             // End Collection
+
+        // -----------------------------------------------------------------
+        // Report ID 5: Gamepad (7-byte Input: 16 Buttons, 4-bit Hat + 4-bit pad, 4x 8-bit Axes)
+        // -----------------------------------------------------------------
+        0x05, 0x01,       // Usage Page (Generic Desktop)
+        0x09, 0x05,       // Usage (Game Pad)
+        0xA1, 0x01,       // Collection (Application)
+        0x85, 0x05,       //   Report ID (5)
+        0x05, 0x09,       //   Usage Page (Button)
+        0x19, 0x01,       //   Usage Minimum (Button 1)
+        0x29, 0x10,       //   Usage Maximum (Button 16)
+        0x15, 0x00,       //   Logical Minimum (0)
+        0x25, 0x01,       //   Logical Maximum (1)
+        0x75, 0x01,       //   Report Size (1)
+        0x95, 0x10,       //   Report Count (16)
+        0x81, 0x02,       //   Input (Data, Var, Abs)
+        0x05, 0x01,       //   Usage Page (Generic Desktop)
+        0x09, 0x39,       //   Usage (Hat switch)
+        0x15, 0x00,       //   Logical Minimum (0)
+        0x25, 0x07,       //   Logical Maximum (7)
+        0x35, 0x00,       //   Physical Minimum (0)
+        0x46, 0x3B, 0x01, //   Physical Maximum (315)
+        0x65, 0x14,       //   Unit (Eng Rot: Angular Pos)
+        0x75, 0x04,       //   Report Size (4)
+        0x95, 0x01,       //   Report Count (1)
+        0x81, 0x42,       //   Input (Data, Var, Abs, Null)
+        0x65, 0x00,       //   Unit (None)
+        0x75, 0x04,       //   Report Size (4)
+        0x95, 0x01,       //   Report Count (1)
+        0x81, 0x03,       //   Input (Const, Var, Abs)
+        0x09, 0x30,       //   Usage (X)
+        0x09, 0x31,       //   Usage (Y)
+        0x09, 0x32,       //   Usage (Z)
+        0x09, 0x35,       //   Usage (Rz)
+        0x15, 0x81,       //   Logical Minimum (-127)
+        0x25, 0x7F,       //   Logical Maximum (127)
+        0x75, 0x08,       //   Report Size (8)
+        0x95, 0x04,       //   Report Count (4)
+        0x81, 0x02,       //   Input (Data, Var, Abs)
         0xC0              // End Collection
     ]
 
@@ -231,6 +273,17 @@ enum HIDReportBuilder {
 
     static func systemReport(usage: HIDSystemUsage) -> Data {
         Data([usage.rawValue & 0x07])
+    }
+
+    static func gamepadReport(_ state: HIDGamepadState = HIDGamepadState()) -> Data {
+        let btnLow = UInt8(state.buttons.rawValue & 0xFF)
+        let btnHigh = UInt8((state.buttons.rawValue >> 8) & 0xFF)
+        let hatByte = state.hat.rawValue & 0x0F
+        let lx = UInt8(bitPattern: clampToHIDSignedByte(Int(state.leftX)))
+        let ly = UInt8(bitPattern: clampToHIDSignedByte(Int(state.leftY)))
+        let rx = UInt8(bitPattern: clampToHIDSignedByte(Int(state.rightX)))
+        let ry = UInt8(bitPattern: clampToHIDSignedByte(Int(state.rightY)))
+        return Data([btnLow, btnHigh, hatByte, lx, ly, rx, ry])
     }
 
     static func parseLEDOutput(_ data: Data) -> HIDLEDState {
