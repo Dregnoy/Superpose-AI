@@ -57,6 +57,7 @@ final class AppViewModel: ObservableObject {
                 return
             }
             storageService.saveSettings(settings)
+            updateIdleTimer()
         }
     }
 
@@ -114,6 +115,7 @@ final class AppViewModel: ObservableObject {
     private func wireBLECallbacks() {
         bleService.onStateChange = { [weak self] state in
             self?.connectionState = state
+            self?.updateIdleTimer()
         }
         bleService.onLEDStateChange = { [weak self] led in
             self?.ledState = led
@@ -270,6 +272,7 @@ final class AppViewModel: ObservableObject {
 
     func handleAppDidBecomeActive() {
         bleService.ensureAdvertisingOnForeground()
+        updateIdleTimer()
     }
 
     // MARK: Trackpad & Mouse
@@ -724,7 +727,7 @@ final class AppViewModel: ObservableObject {
         jigglerTask?.cancel()
         isJigglerActive = true
         jigglerCountdownSeconds = settings.jigglerIntervalSeconds
-        UIApplication.shared.isIdleTimerDisabled = true
+        updateIdleTimer()
         triggerHaptic(.medium)
         showToast("Uyanık Tut (Jiggler) başlatıldı")
 
@@ -748,9 +751,14 @@ final class AppViewModel: ObservableObject {
         jigglerTask?.cancel()
         jigglerTask = nil
         isJigglerActive = false
-        UIApplication.shared.isIdleTimerDisabled = false
+        updateIdleTimer()
         triggerHaptic(.light)
         showToast("Uyanık Tut durduruldu")
+    }
+
+    private func updateIdleTimer() {
+        let keepAwake = isJigglerActive || (settings.keepScreenAwakeWhileAdvertising && connectionState.isActiveRadio)
+        UIApplication.shared.isIdleTimerDisabled = keepAwake
     }
 
     private func performJigglePulse() {
