@@ -442,3 +442,79 @@ struct HIDDiagnosticEvent: Identifiable, Sendable {
         self.hexPayload = hexPayload
     }
 }
+
+/// Outbound BLE connection status for host devices discovered via CBCentralManager.
+enum BLEHostLinkState: Equatable, Sendable {
+    case discovered
+    case connecting
+    case connected
+    case failed(String)
+
+    var label: String {
+        switch self {
+        case .discovered:
+            return "Bulundu"
+        case .connecting:
+            return "Bağlanıyor..."
+        case .connected:
+            return "Bağlı (BLE)"
+        case .failed(let reason):
+            return "Hata: \(reason)"
+        }
+    }
+
+    var isConnected: Bool {
+        if case .connected = self { return true }
+        return false
+    }
+
+    var isConnecting: Bool {
+        if case .connecting = self { return true }
+        return false
+    }
+}
+
+/// Nearby BLE host device discovered by the iPhone scanner or already connected at OS level.
+struct DiscoveredBLEHost: Identifiable, Equatable, Sendable {
+    let id: UUID
+    var name: String
+    var hasExplicitName: Bool
+    var rssi: Int
+    var isConnectable: Bool
+    var isSystemConnected: Bool
+    var linkState: BLEHostLinkState
+    var lastSeen: Date
+
+    static func sortForDisplay(_ hosts: [DiscoveredBLEHost]) -> [DiscoveredBLEHost] {
+        hosts.sorted { lhs, rhs in
+            let lRank = sortRank(lhs)
+            let rRank = sortRank(rhs)
+            if lRank != rRank {
+                return lRank < rRank
+            }
+            if lhs.rssi != rhs.rssi {
+                return lhs.rssi > rhs.rssi
+            }
+            return lhs.name.localizedCaseInsensitiveCompare(rhs.name) == .orderedAscending
+        }
+    }
+
+    private static func sortRank(_ host: DiscoveredBLEHost) -> Int {
+        if host.linkState.isConnected { return 0 }
+        if host.linkState.isConnecting { return 1 }
+        if host.isSystemConnected { return 2 }
+        if host.hasExplicitName { return 3 }
+        return 4
+    }
+}
+
+/// Live HOGP GATT service registration & advertising diagnostics.
+struct HOGPServiceStatus: Equatable, Sendable {
+    var batteryAdded: Bool = false
+    var deviceInfoAdded: Bool = false
+    var hidAdded: Bool = false
+    var includedBatteryInHID: Bool = false
+    var isAdvertising: Bool = false
+    var advertisingMode: String = "Bekliyor"
+    var lastError: String? = nil
+}
