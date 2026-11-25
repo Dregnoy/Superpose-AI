@@ -4,6 +4,7 @@ import UIKit
 struct ConnectionSettingsView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var nameDraft: String = ""
+    @State private var onlyNamedHosts: Bool = true
 
     var body: some View {
         ScrollView {
@@ -11,13 +12,16 @@ struct ConnectionSettingsView: View {
                 // 1. Bluetooth Broadcast & Identity Card
                 bluetoothControlCard
 
-                // 2. Step-by-Step Pairing Guides
+                // 2. Outbound BLE Host Scanner (Connect from iPhone)
+                nearbyHostsCard
+
+                // 3. Step-by-Step Pairing Guides
                 pairingGuidesCard
 
-                // 3. Trackpad, Keyboard & Haptics Preferences
+                // 4. Trackpad, Keyboard & Haptics Preferences
                 preferencesCard
 
-                // 4. Live HID Protocol Diagnostic Log
+                // 5. Live HID Protocol Diagnostic Log
                 diagnosticsCard
             }
             .padding(14)
@@ -73,24 +77,72 @@ struct ConnectionSettingsView: View {
                 statPill(title: "Gönderilen Paket", value: "\(viewModel.packetsSentCount)")
             }
 
-            Button {
-                viewModel.toggleBluetoothAdvertising()
-            } label: {
-                Label(
-                    viewModel.connectionState.isActiveRadio ? "Yayını Durdur" : "Yayını Başlat",
-                    systemImage: viewModel.connectionState.isActiveRadio ? "stop.fill" : "play.fill"
-                )
-                .font(.subheadline.weight(.bold))
-                .foregroundStyle(viewModel.connectionState.isActiveRadio ? .white : BluePadTheme.bgPrimary)
-                .frame(maxWidth: .infinity)
-                .frame(height: 44)
+            // Live GATT & Advertising Diagnostics Summary
+            VStack(alignment: .leading, spacing: 6) {
+                HStack(spacing: 6) {
+                    gattBadge(code: "180F", active: viewModel.gattStatus.batteryAdded)
+                    gattBadge(code: "180A", active: viewModel.gattStatus.deviceInfoAdded)
+                    gattBadge(code: "1812", active: viewModel.gattStatus.hidAdded)
+                    Spacer()
+                    Text(viewModel.gattStatus.advertisingMode)
+                        .font(.system(size: 11, weight: .semibold, design: .monospaced))
+                        .foregroundStyle(viewModel.gattStatus.isAdvertising ? BluePadTheme.accentMint : BluePadTheme.accentAmber)
+                        .lineLimit(1)
+                }
+
+                if let err = viewModel.gattStatus.lastError {
+                    Text("Son Hata: \(err)")
+                        .font(.caption2.weight(.semibold))
+                        .foregroundStyle(BluePadTheme.accentRose)
+                        .lineLimit(2)
+                }
+
+                if let latest = viewModel.diagnosticEvents.first {
+                    Text("Son olay [\(latest.category.rawValue)]: \(latest.message)")
+                        .font(.system(size: 10, design: .monospaced))
+                        .foregroundStyle(BluePadTheme.textSecondary)
+                        .lineLimit(1)
+                }
             }
-            .buttonStyle(
-                KeycapButtonStyle(
-                    fill: viewModel.connectionState.isActiveRadio ? BluePadTheme.accentRose.opacity(0.85) : BluePadTheme.accentMint,
-                    border: BluePadTheme.borderSubtle
-                )
+            .padding(10)
+            .background(
+                RoundedRectangle(cornerRadius: 10, style: .continuous)
+                    .fill(BluePadTheme.bgPrimary)
             )
+
+            HStack(spacing: 10) {
+                Button {
+                    viewModel.toggleBluetoothAdvertising()
+                } label: {
+                    Label(
+                        viewModel.connectionState.isActiveRadio ? "Yayını Durdur" : "Yayını Başlat",
+                        systemImage: viewModel.connectionState.isActiveRadio ? "stop.fill" : "play.fill"
+                    )
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(viewModel.connectionState.isActiveRadio ? .white : BluePadTheme.bgPrimary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 44)
+                }
+                .buttonStyle(
+                    KeycapButtonStyle(
+                        fill: viewModel.connectionState.isActiveRadio ? BluePadTheme.accentRose.opacity(0.85) : BluePadTheme.accentMint,
+                        border: BluePadTheme.borderSubtle
+                    )
+                )
+
+                Button {
+                    viewModel.triggerServiceChangedRefresh()
+                } label: {
+                    Label("GATT Yenile", systemImage: "arrow.triangle.2.circlepath")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(BluePadTheme.accentCyan)
+                        .padding(.horizontal, 12)
+                        .frame(height: 44)
+                }
+                .buttonStyle(KeycapButtonStyle(fill: BluePadTheme.bgPrimary, border: BluePadTheme.accentCyan.opacity(0.35)))
+                .disabled(!viewModel.gattStatus.hidAdded)
+                .opacity(viewModel.gattStatus.hidAdded ? 1.0 : 0.45)
+            }
 
             if !viewModel.connectionState.isActiveRadio {
                 Button {
@@ -110,6 +162,131 @@ struct ConnectionSettingsView: View {
         .glassCard()
     }
 
+    // MARK: Outbound Nearby Hosts Scanner Card
+
+    private var filteredHosts: [DiscoveredBLEHost] {
+        if onlyNamedHosts {
+            return viewModel.discoveredHosts.filter {
+                $0.hasExplicitName || $0.linkState.isConnected || $0.linkState.isConnecting || $0.isSystemConnected
+            }
+        }
+        return viewModel.discoveredHosts
+    }
+
+    private var nearbyHostsCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Label("Yakındaki Cihazlar (iPhone'dan Bağlan)", systemImage: "antenna.radiowaves.left.and.right")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(BluePadTheme.accentMint)
+                Spacer()
+                Button {
+                    viewModel.toggleHostScan()
+                } label: {
+                    HStack(spacing: 6) {
+                        if viewModel.isScanningHosts {
+                            ProgressView()
+                                .controlSize(.mini)
+                                .tint(BluePadTheme.bgPrimary)
+                        }
+                        Text(viewModel.isScanningHosts ? "Durdur" : "Tara")
+                            .font(.caption.weight(.bold))
+                    }
+                    .foregroundStyle(BluePadTheme.bgPrimary)
+                    .padding(.horizontal, 12)
+                    .padding(.vertical, 7)
+                    .background(
+                        RoundedRectangle(cornerRadius: 9, style: .continuous)
+                            .fill(viewModel.isScanningHosts ? BluePadTheme.accentAmber : BluePadTheme.accentMint)
+                    )
+                }
+                .buttonStyle(.plain)
+            }
+
+            Text("Diğer cihazlar BluePad'i listelemiyorsa, hedef cihazda Bluetooth Ayarları'nı açık tutup buradan Tara → cihaz adına dokunarak iPhone'dan bağlanın.")
+                .font(.caption2)
+                .foregroundStyle(BluePadTheme.textSecondary)
+
+            Toggle("Sadece isimli cihazları göster", isOn: $onlyNamedHosts)
+                .font(.caption.weight(.semibold))
+                .tint(BluePadTheme.accentCyan)
+
+            if filteredHosts.isEmpty {
+                let emptyHint: String = viewModel.discoveredHosts.isEmpty
+                    ? "Henüz BLE cihazı taranmadı. Hedef cihazın Bluetooth ayarlarını açıp 'Tara' butonuna basın."
+                    : "İsimsiz \(viewModel.discoveredHosts.count) BLE sinyali bulundu. Görmek için yukarıdaki filtreyi kapatın."
+                Text(emptyHint)
+                    .font(.caption)
+                    .foregroundStyle(BluePadTheme.textSecondary)
+                    .padding(.vertical, 8)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal, 10)
+                    .background(RoundedRectangle(cornerRadius: 10).fill(BluePadTheme.bgPrimary))
+            } else {
+                LazyVStack(spacing: 8) {
+                    ForEach(filteredHosts.prefix(20)) { host in
+                        HStack(spacing: 10) {
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text(host.name)
+                                    .font(.caption.weight(.bold))
+                                    .foregroundStyle(BluePadTheme.textPrimary)
+                                    .lineLimit(1)
+
+                                HStack(spacing: 6) {
+                                    Text("\(host.rssi) dBm")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(BluePadTheme.textSecondary)
+
+                                    if host.isSystemConnected && !host.linkState.isConnected {
+                                        Text("Sistem / Eşli")
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundStyle(BluePadTheme.accentCyan)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 1)
+                                            .background(RoundedRectangle(cornerRadius: 4).fill(BluePadTheme.accentCyan.opacity(0.15)))
+                                    }
+
+                                    if host.linkState != .discovered {
+                                        Text(host.linkState.label)
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundStyle(host.linkState.isConnected ? BluePadTheme.accentMint : BluePadTheme.accentAmber)
+                                    }
+                                }
+                            }
+
+                            Spacer()
+
+                            Button {
+                                if host.linkState.isConnected || host.linkState.isConnecting {
+                                    viewModel.disconnectFromHost(host)
+                                } else {
+                                    viewModel.connectToHost(host)
+                                }
+                            } label: {
+                                Text(host.linkState.isConnected ? "Kes" : (host.linkState.isConnecting ? "İptal" : "Bağlan"))
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(host.linkState.isConnected ? .white : BluePadTheme.bgPrimary)
+                                    .padding(.horizontal, 12)
+                                    .padding(.vertical, 7)
+                                    .background(
+                                        RoundedRectangle(cornerRadius: 8, style: .continuous)
+                                            .fill(host.linkState.isConnected ? BluePadTheme.accentRose : BluePadTheme.accentCyan)
+                                    )
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        .padding(10)
+                        .background(
+                            RoundedRectangle(cornerRadius: 10, style: .continuous)
+                                .fill(BluePadTheme.bgPrimary)
+                        )
+                    }
+                }
+            }
+        }
+        .glassCard()
+    }
+
     // MARK: Pairing Guides
 
     private var pairingGuidesCard: some View {
@@ -118,32 +295,32 @@ struct ConnectionSettingsView: View {
                 .font(.subheadline.weight(.bold))
                 .foregroundStyle(BluePadTheme.accentMint)
 
-            DisclosureGroup("Windows 10 / 11 ile Eşleştirme") {
-                Text("1. Bilgisayarda Ayarlar → Bluetooth ve cihazlar → Cihaz ekle → Bluetooth'u seçin.\n2. Listede \"\(viewModel.settings.advertisedName)\" (veya iPhone adınızı) seçin.\n3. Bağlanınca hem iPhone'da hem Windows'ta çıkan eşleştirme onayını kabul edin.")
+            DisclosureGroup("Yöntem 1: iPhone'dan Bağlan (Görünmeyen Cihazlar İçin)") {
+                Text("1. Hedef cihazda (Windows / Android / Mac / TV) Bluetooth Ayarları ekranını açık bırakın.\n2. BluePad içinde yukarıdaki 'Yakındaki Cihazlar → Tara' butonuna dokunun.\n3. Listede cihazınızı seçip 'Bağlan' deyin; iPhone bağlantıyı başlatınca karşı taraf 0x1812 HID servisini algılar.\n4. İkisinde de çıkan eşleştirme PIN/onayını kabul edin.")
+                    .font(.caption)
+                    .foregroundStyle(BluePadTheme.textSecondary)
+                    .padding(.top, 4)
+            }
+            .tint(BluePadTheme.accentMint)
+
+            DisclosureGroup("Yöntem 2: Hedef Cihazdan Windows 10 / 11'e Eşleştirme") {
+                Text("1. Windows 11'de Ayarlar → Bluetooth ve cihazlar → Cihazlar → 'Bluetooth cihazlarını bulma' seçeneğini 'Gelişmiş' yapın.\n2. Cihaz ekle → Bluetooth menüsünde \"\(viewModel.settings.advertisedName)\" (veya iPhone adınızı) seçin.\n3. Görünmezse Yöntem 1 ile iPhone'dan bağlanıp 'GATT Yenile' butonuna basın.")
                     .font(.caption)
                     .foregroundStyle(BluePadTheme.textSecondary)
                     .padding(.top, 4)
             }
             .tint(BluePadTheme.accentCyan)
 
-            DisclosureGroup("macOS & iPadOS ile Eşleştirme") {
-                Text("1. Mac veya iPad'de Sistem Ayarları → Bluetooth menüsünü açın.\n2. \"Yakındaki Cihazlar\" altında \"\(viewModel.settings.advertisedName)\" göründüğünde Bağlan'a tıklayın.\n3. Eşleşme sonrası hiçbir ek uygulama olmadan klavye ve trackpad çalışır.")
+            DisclosureGroup("macOS & iPadOS / Aynı Apple ID") {
+                Text("1. Aynı Apple ID ile giriş yapılmış iki Apple cihazında Ayarlar → Bluetooth diğer cihazı gizleyebilir.\n2. Bu durumda hedef Mac/iPad'de Bluetooth ayarını açık tutup yukarıdaki 'Yakındaki Cihazlar' listesinden bağlanın.\n3. Bağlantı kurulunca hedef cihaz otomatik olarak 0x1812 HID profiline abone olur.")
                     .font(.caption)
                     .foregroundStyle(BluePadTheme.textSecondary)
                     .padding(.top, 4)
             }
             .tint(BluePadTheme.accentCyan)
 
-            DisclosureGroup("Android / Google TV / Linux") {
-                Text("1. TV veya cihazınızın Bluetooth Ayarları → Aksesuar Ekle bölümüne girin.\n2. \"\(viewModel.settings.advertisedName)\" cihazını seçip eşleştirin.\n3. Kumanda sekmesindeki D-Pad ve Medya tuşlarıyla TV'yi yönetin.")
-                    .font(.caption)
-                    .foregroundStyle(BluePadTheme.textSecondary)
-                    .padding(.top, 4)
-            }
-            .tint(BluePadTheme.accentCyan)
-
-            DisclosureGroup("Bağlantı Kopuyorsa / Eşleşmiyorsa") {
-                Text("HOGP protokolü şifreli bağlama (bonding) gerektirir. Eğer bir tarafta eski eşleştirme anahtarı kaldıysa bağlantı hemen düşebilir:\n• Hedef cihazda Bluetooth listesinden iPhone'u 'Cihazı Unut' yapın.\n• iPhone Ayarlar → Bluetooth altından hedef cihazı 'Bu Aygıtı Unut' yapın.\n• Ardından yeniden eşleştirin.")
+            DisclosureGroup("Android / Google TV / Linux & Eşleşme Sıfırlama") {
+                Text("1. HOGP protokolü şifreli bağlama (bonding) gerektirir. Eski/yarım kalan eşleşme varsa iki taraftan da cihazı 'Unut' yapın.\n2. TV/Android aksesuar taramasında görünmezse Yöntem 1'i kullanın veya 'GATT Yenile'ye basın.")
                     .font(.caption)
                     .foregroundStyle(BluePadTheme.textSecondary)
                     .padding(.top, 4)
@@ -341,6 +518,22 @@ struct ConnectionSettingsView: View {
             Slider(value: value, in: range, step: step)
                 .tint(BluePadTheme.accentCyan)
         }
+    }
+
+    private func gattBadge(code: String, active: Bool) -> some View {
+        HStack(spacing: 3) {
+            Image(systemName: active ? "checkmark.circle.fill" : "clock")
+                .font(.system(size: 9))
+            Text(code)
+                .font(.system(size: 10, weight: .bold, design: .monospaced))
+        }
+        .foregroundStyle(active ? BluePadTheme.accentMint : BluePadTheme.textSecondary)
+        .padding(.horizontal, 6)
+        .padding(.vertical, 3)
+        .background(
+            RoundedRectangle(cornerRadius: 6, style: .continuous)
+                .fill((active ? BluePadTheme.accentMint : BluePadTheme.textSecondary).opacity(0.14))
+        )
     }
 
     private func categoryColor(_ category: HIDDiagnosticEvent.Category) -> Color {
