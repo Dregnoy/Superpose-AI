@@ -16,6 +16,7 @@ final class AppViewModel: ObservableObject {
 
     // MARK: Services
     let bleService: BLEHIDPeripheralService
+    let wifiService: WiFiHIDTransportService
     let airMouseService: AirMouseMotionService
     let dictationService: SpeechDictationService
     private let storageService: MacroStorageService
@@ -26,6 +27,26 @@ final class AppViewModel: ObservableObject {
     @Published private(set) var connectionState: BLEConnectionState = .unknown
     @Published private(set) var protocolMode: HIDProtocolMode = .report
     @Published private(set) var ledState: HIDLEDState = []
+
+    @Published private(set) var wifiState: WiFiConnectionState = .disconnected
+    @Published private(set) var wifiHosts: [WiFiHostEndpoint] = []
+    @Published private(set) var isScanningWiFi: Bool = false
+    @Published private(set) var gamepadState = HIDGamepadState()
+    @Published var isFullScreenTrackpad: Bool = false
+
+    var isAnyTransportConnected: Bool {
+        connectionState.isConnected || wifiState.isConnected
+    }
+
+    var combinedStatusText: String {
+        if connectionState.isConnected && wifiState.isConnected {
+            return "BLE + Wi-Fi Bağlı"
+        }
+        if wifiState.isConnected {
+            return wifiState.statusText
+        }
+        return connectionState.statusText
+    }
 
     @Published var settings: BluePadSettings {
         didSet {
@@ -68,6 +89,7 @@ final class AppViewModel: ObservableObject {
     // MARK: Private Tasks & Haptics
     private var jigglerTask: Task<Void, Never>?
     private var typingTask: Task<Void, Never>?
+    private var macroTask: Task<Void, Never>?
     private var toastTask: Task<Void, Never>?
     private var hasStartedBLE = false
 
@@ -81,6 +103,7 @@ final class AppViewModel: ObservableObject {
         self.settings = storageService.loadSettings()
         self.macros = storageService.loadMacros()
         self.bleService = BLEHIDPeripheralService()
+        self.wifiService = WiFiHIDTransportService()
         self.airMouseService = AirMouseMotionService()
         self.dictationService = SpeechDictationService()
         self.jigglerCountdownSeconds = self.settings.jigglerIntervalSeconds
@@ -113,14 +136,28 @@ final class AppViewModel: ObservableObject {
         bleService.onGATTStatusChange = { [weak self] status in
             self?.gattStatus = status
         }
+
+        wifiService.onStateChange = { [weak self] state in
+            self?.wifiState = state
+        }
+        wifiService.onDiscoveredHostsChange = { [weak self] hosts in
+            self?.wifiHosts = hosts
+        }
+        wifiService.onDiagnosticEvent = { [weak self] event in
+            self?.appendDiagnostic(event)
+        }
+        wifiService.onPacketSent = { [weak self] in
+            self?.packetsSentCount += 1
+        }
     }
 
-    // MARK: Bluetooth Lifecycle
+    // MARK: Bluetooth & Wi-Fi Lifecycle
 
     func startBluetoothIfNeeded() {
         guard !hasStartedBLE else { return }
         hasStartedBLE = true
         bleService.start(advertisedName: settings.advertisedName)
+        startWiFiDiscovery()
     }
 
     func toggleBluetoothAdvertising() {
@@ -146,13 +183,60 @@ final class AppViewModel: ObservableObject {
     }
 
     func releaseAllInputs() {
+        macroTask?.cancel()
         armedModifiers = []
         lockedModifiers = []
         pressedButtons = []
+        gamepadState = HIDGamepadState()
         motionProcessor.reset()
         bleService.releaseAllKeys()
+        if wifiState.isConnected {
+            wifiService.releaseAll()
+        }
         triggerHaptic(.rigid)
         showToast("Tüm tuşlar serbest bırakıldı")
+    }
+
+    // MARK: Wi-Fi Local Network Transport
+
+    func startWiFiDiscovery() {
+        isScanningWiFi = true
+        wifiService.startDiscovery()
+    }
+
+    func stopWiFiDiscovery() {
+        isScanningWiFi = false
+        wifiService.stopDiscovery()
+    }
+
+    func connectWiFi(host: String, port: UInt16, pin: String) {
+        triggerHaptic(.medium)
+        wifiService.connect(host: host, port: port, pin: pin, deviceName: settings.advertisedName)
+        showToast("Wi-Fi bağlantısı başlatılıyor: \(host):\(port)")
+    }
+
+    func disconnectWiFi() {
+        triggerHaptic(.light)
+        wifiService.disconnect()
+        showToast("Wi-Fi bağlantısı kesildi")
+    }
+
+    func runConnectionTestPulse() {
+        triggerHaptic(.medium)
+        appendDiagnostic(HIDDiagnosticEvent(category: .tx, message: "Bağlantı testi sinyali gönderildi (±36 px)."))
+        bleService.sendMouseMove(dx: 36, dy: 0)
+        if wifiState.isConnected {
+            wifiService.sendMouseMove(dx: 36, dy: 0)
+        }
+        Task { @MainActor [weak self] in
+            try? await Task.sleep(nanoseconds: 250_000_000)
+            guard let self else { return }
+            self.bleService.sendMouseMove(dx: -36, dy: 0)
+            if self.wifiState.isConnected {
+                self.wifiService.sendMouseMove(dx: -36, dy: 0)
+            }
+        }
+        showToast("Test sinyali gönderildi")
     }
 
     func toggleHostScan() {
@@ -199,6 +283,9 @@ final class AppViewModel: ObservableObject {
         )
         if step.dx != 0 || step.dy != 0 {
             bleService.sendMouseMove(dx: step.dx, dy: step.dy)
+            if wifiState.isConnected {
+                wifiService.sendMouseMove(dx: step.dx, dy: step.dy)
+            }
         }
     }
 
@@ -211,6 +298,9 @@ final class AppViewModel: ObservableObject {
         )
         if step.wheel != 0 || step.hWheel != 0 {
             bleService.sendMouseMove(dx: 0, dy: 0, wheel: step.wheel, hWheel: step.hWheel)
+            if wifiState.isConnected {
+                wifiService.sendMouseMove(dx: 0, dy: 0, wheel: step.wheel, hWheel: step.hWheel)
+            }
         }
     }
 
@@ -221,6 +311,9 @@ final class AppViewModel: ObservableObject {
     func clickMouse(_ button: HIDMouseButton) {
         triggerHaptic(.light)
         bleService.clickMouseButton(button)
+        if wifiState.isConnected {
+            wifiService.clickMouseButton(button)
+        }
     }
 
     func setMouseButton(_ button: HIDMouseButton, pressed: Bool) {
@@ -231,6 +324,58 @@ final class AppViewModel: ObservableObject {
             pressedButtons.remove(button)
         }
         bleService.setMouseButton(button, pressed: pressed)
+        if wifiState.isConnected {
+            wifiService.sendMouseButton(button, pressed: pressed)
+        }
+    }
+
+    // MARK: Gamepad Controls
+
+    func setGamepadButton(_ button: HIDGamepadButton, pressed: Bool) {
+        if pressed {
+            gamepadState.buttons.insert(button)
+            triggerHaptic(.light)
+        } else {
+            gamepadState.buttons.remove(button)
+        }
+        pushGamepadState()
+    }
+
+    func setGamepadHat(_ hat: HIDGamepadHat) {
+        guard gamepadState.hat != hat else { return }
+        if hat != .center {
+            triggerHaptic(.light)
+        }
+        gamepadState.hat = hat
+        pushGamepadState()
+    }
+
+    func setGamepadLeftStick(x: Int8, y: Int8) {
+        guard gamepadState.leftX != x || gamepadState.leftY != y else { return }
+        gamepadState.leftX = x
+        gamepadState.leftY = y
+        pushGamepadState()
+    }
+
+    func setGamepadRightStick(x: Int8, y: Int8) {
+        guard gamepadState.rightX != x || gamepadState.rightY != y else { return }
+        gamepadState.rightX = x
+        gamepadState.rightY = y
+        pushGamepadState()
+    }
+
+    func resetGamepad() {
+        gamepadState = HIDGamepadState()
+        pushGamepadState()
+        triggerHaptic(.medium)
+        showToast("Gamepad sıfırlandı")
+    }
+
+    private func pushGamepadState() {
+        bleService.sendGamepad(gamepadState)
+        if wifiState.isConnected {
+            wifiService.sendGamepad(gamepadState)
+        }
     }
 
     // MARK: Air Mouse (Gyroscope)
@@ -265,6 +410,9 @@ final class AppViewModel: ObservableObject {
                 )
                 if step.dx != 0 || step.dy != 0 {
                     self.bleService.sendMouseMove(dx: step.dx, dy: step.dy)
+                    if self.wifiState.isConnected {
+                        self.wifiService.sendMouseMove(dx: step.dx, dy: step.dy)
+                    }
                 }
             }
         )
@@ -314,6 +462,9 @@ final class AppViewModel: ObservableObject {
     func sendRawKey(_ keyCode: UInt8, extraModifiers: HIDModifier = []) {
         let combined = effectiveModifiers.union(extraModifiers)
         bleService.tapKey(keyCode, modifiers: combined)
+        if wifiState.isConnected {
+            wifiService.tapKey(keyCode, modifiers: combined)
+        }
         armedModifiers = []
         triggerHaptic(.light)
     }
@@ -328,13 +479,25 @@ final class AppViewModel: ObservableObject {
             return
         }
 
+        let activeMods = effectiveModifiers
+        let hasCommandMod = !activeMods.intersection([.leftControl, .rightControl, .leftAlt, .leftGUI, .rightGUI]).isEmpty
+
         if let stroke = KeyboardLayoutEngine.keyStroke(for: character, layout: settings.keyboardLayout) {
-            let activeMods = effectiveModifiers
             // When user armed Ctrl/Alt/Win for a hotkey while iOS keyboard sent an uppercase letter,
             // avoid adding accidental Shift unless user explicitly armed/locked Shift.
-            let hasCommandMod = !activeMods.intersection([.leftControl, .rightControl, .leftAlt, .leftGUI, .rightGUI]).isEmpty
             let baseMods = hasCommandMod ? activeMods : stroke.modifiers.union(activeMods)
             bleService.tapKey(stroke.keyCode, modifiers: baseMods)
+            if wifiState.isConnected {
+                if hasCommandMod {
+                    wifiService.tapKey(stroke.keyCode, modifiers: baseMods)
+                } else {
+                    wifiService.sendText(String(character), appendEnter: false)
+                }
+            }
+            armedModifiers = []
+            triggerHaptic(.light)
+        } else if wifiState.isConnected {
+            wifiService.sendText(String(character), appendEnter: false)
             armedModifiers = []
             triggerHaptic(.light)
         } else {
@@ -343,10 +506,24 @@ final class AppViewModel: ObservableObject {
     }
 
     func typeText(_ text: String, appendEnter: Bool = false) {
+        if wifiState.isConnected {
+            wifiService.sendText(text, appendEnter: appendEnter)
+        }
+
         let payload = appendEnter ? text + "\n" : text
         let strokes = KeyboardLayoutEngine.keyStrokes(for: payload, layout: settings.keyboardLayout)
+
+        if !connectionState.isConnected {
+            if !wifiState.isConnected && strokes.isEmpty {
+                showToast("Gönderilecek desteklenen metin bulunamadı")
+            }
+            return
+        }
+
         guard !strokes.isEmpty else {
-            showToast("Gönderilecek desteklenen metin bulunamadı")
+            if !wifiState.isConnected {
+                showToast("Gönderilecek desteklenen metin bulunamadı")
+            }
             return
         }
 
@@ -397,8 +574,15 @@ final class AppViewModel: ObservableObject {
     }
 
     func handleScannedBarcode(_ code: String) {
-        lastScannedBarcode = code
         isScannerPresented = false
+        if let pairing = WiFiHIDTransportService.parsePairingQR(code) {
+            triggerHaptic(.medium)
+            connectWiFi(host: pairing.host, port: pairing.port, pin: pairing.pin)
+            showToast("Wi-Fi QR algılandı: \(pairing.host)")
+            return
+        }
+
+        lastScannedBarcode = code
         triggerHaptic(.medium)
         showToast("Tarandı ve yazılıyor: \(code)")
         typeText(code, appendEnter: settings.scannerAutoEnter)
@@ -409,11 +593,17 @@ final class AppViewModel: ObservableObject {
     func tapConsumer(_ usage: HIDConsumerUsage) {
         triggerHaptic(.light)
         bleService.tapConsumer(usage)
+        if wifiState.isConnected {
+            wifiService.tapConsumer(usage)
+        }
     }
 
     func pressConsumer(_ usage: HIDConsumerUsage) {
         triggerHaptic(.light)
         bleService.sendConsumerPress(usage)
+        if wifiState.isConnected {
+            wifiService.tapConsumer(usage)
+        }
     }
 
     func releaseConsumer() {
@@ -423,6 +613,9 @@ final class AppViewModel: ObservableObject {
     func tapSystem(_ usage: HIDSystemUsage) {
         triggerHaptic(.medium)
         bleService.tapSystem(usage)
+        if wifiState.isConnected {
+            wifiService.tapSystem(usage)
+        }
     }
 
     // MARK: Macros
@@ -431,7 +624,11 @@ final class AppViewModel: ObservableObject {
         triggerHaptic(.medium)
         switch macro.action {
         case .keyCombo(let keyCode, let modifiersRaw):
-            bleService.tapKey(keyCode, modifiers: HIDModifier(rawValue: modifiersRaw))
+            let mods = HIDModifier(rawValue: modifiersRaw)
+            bleService.tapKey(keyCode, modifiers: mods)
+            if wifiState.isConnected {
+                wifiService.tapKey(keyCode, modifiers: mods)
+            }
             showToast("Makro: \(macro.title)")
         case .typeText(let text, let appendEnter):
             showToast("Yazılıyor: \(macro.title)")
@@ -439,11 +636,57 @@ final class AppViewModel: ObservableObject {
         case .consumerKey(let usageRaw):
             if let usage = HIDConsumerUsage(rawValue: usageRaw) {
                 bleService.tapConsumer(usage)
+                if wifiState.isConnected {
+                    wifiService.tapConsumer(usage)
+                }
                 showToast("Medya: \(macro.title)")
             }
         case .systemKey(let usageRaw):
-            bleService.tapSystem(HIDSystemUsage(rawValue: usageRaw))
+            let sys = HIDSystemUsage(rawValue: usageRaw)
+            bleService.tapSystem(sys)
+            if wifiState.isConnected {
+                wifiService.tapSystem(sys)
+            }
             showToast("Sistem: \(macro.title)")
+        case .sequence(let steps):
+            showToast("Dizi çalıştırılıyor: \(macro.title)")
+            runMacroSequence(steps)
+        }
+    }
+
+    private func runMacroSequence(_ steps: [MacroStep]) {
+        macroTask?.cancel()
+        macroTask = Task { [weak self] in
+            guard let self else { return }
+            for step in steps {
+                if Task.isCancelled { break }
+                switch step {
+                case .keyCombo(let keyCode, let modifiersRaw):
+                    let mods = HIDModifier(rawValue: modifiersRaw)
+                    self.bleService.tapKey(keyCode, modifiers: mods)
+                    if self.wifiState.isConnected {
+                        self.wifiService.tapKey(keyCode, modifiers: mods)
+                    }
+                case .typeText(let text, let appendEnter):
+                    self.typeText(text, appendEnter: appendEnter)
+                    if self.connectionState.isConnected {
+                        let charCount = text.count + (appendEnter ? 1 : 0)
+                        let estNs = UInt64(max(60, charCount * max(5, self.settings.typingDelayMs) + 40)) * 1_000_000
+                        try? await Task.sleep(nanoseconds: estNs)
+                    }
+                case .consumerKey(let usageRaw):
+                    if let usage = HIDConsumerUsage(rawValue: usageRaw) {
+                        self.bleService.tapConsumer(usage)
+                        if self.wifiState.isConnected {
+                            self.wifiService.tapConsumer(usage)
+                        }
+                    }
+                case .delayMs(let ms):
+                    let clamped = min(5_000, max(10, ms))
+                    try? await Task.sleep(nanoseconds: UInt64(clamped) * 1_000_000)
+                }
+                try? await Task.sleep(nanoseconds: 50_000_000)
+            }
         }
     }
 
@@ -514,12 +757,22 @@ final class AppViewModel: ObservableObject {
         switch settings.jigglerMode {
         case .microMouse:
             bleService.sendMouseMove(dx: 1, dy: 0)
+            if wifiState.isConnected {
+                wifiService.sendMouseMove(dx: 1, dy: 0)
+            }
             Task { @MainActor [weak self] in
                 try? await Task.sleep(nanoseconds: 60_000_000)
-                self?.bleService.sendMouseMove(dx: -1, dy: 0)
+                guard let self else { return }
+                self.bleService.sendMouseMove(dx: -1, dy: 0)
+                if self.wifiState.isConnected {
+                    self.wifiService.sendMouseMove(dx: -1, dy: 0)
+                }
             }
         case .shiftPulse:
             bleService.tapKey(HIDKeyCode.none.rawValue, modifiers: .leftShift)
+            if wifiState.isConnected {
+                wifiService.tapKey(HIDKeyCode.none.rawValue, modifiers: .leftShift)
+            }
         }
     }
 
