@@ -1,6 +1,6 @@
 # BluePad iOS — Sunucusuz Bluetooth HID Klavye, Mouse & Kumanda
 
-**BluePad**, Android'deki `io.appground.blek` (*Bluetooth Keyboard & Mouse*) uygulamasının iOS 17+ için sıfır dış bağımlılıkla yazılmış saf native **SwiftUI** karşılığıdır.
+**BluePad**, Android'deki (*Bluetooth Keyboard & Mouse*) uygulamasının iOS 17+ için sıfır dış bağımlılıkla yazılmış saf native **SwiftUI** karşılığıdır.
 
 Karşı bilgisayara, tablete veya akıllı TV'ye **hiçbir yardımcı sunucu (server) programı veya sürücü kurmadan**, iPhone/iPad'inizi doğrudan standart bir **Bluetooth HID (HOGP)** klavye, çoklu dokunmatik trackpad, medya/TV kumandası ve sunum aracı olarak kullanabilirsiniz.
 
