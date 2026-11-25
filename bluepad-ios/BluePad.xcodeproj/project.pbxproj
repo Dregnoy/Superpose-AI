@@ -1,0 +1,440 @@
+// !$*UTF8*$!
+{
+	archiveVersion = 1;
+	classes = {
+	};
+	objectVersion = 56;
+	objects = {
+
+/* Begin PBXBuildFile section */
+		BPB001000000000000000001 /* AppViewModel.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000001 /* AppViewModel.swift */; };
+		BPB001000000000000000002 /* BluePadApp.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000002 /* BluePadApp.swift */; };
+		BPB001000000000000000003 /* AppSettingsAndMacros.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000003 /* AppSettingsAndMacros.swift */; };
+		BPB001000000000000000004 /* HIDModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000004 /* HIDModels.swift */; };
+		BPB001000000000000000005 /* KeyboardLayout.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000005 /* KeyboardLayout.swift */; };
+		BPB001000000000000000006 /* AirMouseMotionService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000006 /* AirMouseMotionService.swift */; };
+		BPB001000000000000000007 /* BLEHIDPeripheralService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000007 /* BLEHIDPeripheralService.swift */; };
+		BPB001000000000000000008 /* HIDReportMap.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000008 /* HIDReportMap.swift */; };
+		BPB001000000000000000009 /* HOGPUUIDs.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000009 /* HOGPUUIDs.swift */; };
+		BPB00100000000000000000A /* MacroStorageService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF00100000000000000000A /* MacroStorageService.swift */; };
+		BPB00100000000000000000B /* MouseMotionProcessor.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF00100000000000000000B /* MouseMotionProcessor.swift */; };
+		BPB00100000000000000000C /* SpeechDictationService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF00100000000000000000C /* SpeechDictationService.swift */; };
+		BPB00100000000000000000D /* BarcodeScannerSheet.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF00100000000000000000D /* BarcodeScannerSheet.swift */; };
+		BPB00100000000000000000E /* ConnectionSettingsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF00100000000000000000E /* ConnectionSettingsView.swift */; };
+		BPB00100000000000000000F /* KeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF00100000000000000000F /* KeyboardView.swift */; };
+		BPB001000000000000000010 /* RemotePresenterView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000010 /* RemotePresenterView.swift */; };
+		BPB001000000000000000011 /* StatusHeaderBar.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000011 /* StatusHeaderBar.swift */; };
+		BPB001000000000000000012 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000012 /* Theme.swift */; };
+		BPB001000000000000000013 /* ToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000013 /* ToolsView.swift */; };
+		BPB001000000000000000014 /* TrackpadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000014 /* TrackpadView.swift */; };
+		BPB001000000000000000016 /* WiFiHIDTransportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000016 /* WiFiHIDTransportService.swift */; };
+		BPB001000000000000000017 /* GamepadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000017 /* GamepadView.swift */; };
+		BPB001000000000000000018 /* FullPCKeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000018 /* FullPCKeyboardView.swift */; };
+		BPB002000000000000000015 /* BluePadCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF002000000000000000015 /* BluePadCoreTests.swift */; };
+		BPA002000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BPA001000000000000000001 /* Assets.xcassets */; };
+/* End PBXBuildFile section */
+
+/* Begin PBXContainerItemProxy section */
+		BPE010000000000000000001 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = BPE000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = BPE001000000000000000001;
+			remoteInfo = BluePad;
+		};
+/* End PBXContainerItemProxy section */
+
+/* Begin PBXFileReference section */
+		BPF001000000000000000001 /* AppViewModel.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AppViewModel.swift"; path = "BluePad/App/AppViewModel.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000002 /* BluePadApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "BluePadApp.swift"; path = "BluePad/App/BluePadApp.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000003 /* AppSettingsAndMacros.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AppSettingsAndMacros.swift"; path = "BluePad/Models/AppSettingsAndMacros.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000004 /* HIDModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "HIDModels.swift"; path = "BluePad/Models/HIDModels.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000005 /* KeyboardLayout.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "KeyboardLayout.swift"; path = "BluePad/Models/KeyboardLayout.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000006 /* AirMouseMotionService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "AirMouseMotionService.swift"; path = "BluePad/Services/AirMouseMotionService.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000007 /* BLEHIDPeripheralService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "BLEHIDPeripheralService.swift"; path = "BluePad/Services/BLEHIDPeripheralService.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000008 /* HIDReportMap.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "HIDReportMap.swift"; path = "BluePad/Services/HIDReportMap.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000009 /* HOGPUUIDs.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "HOGPUUIDs.swift"; path = "BluePad/Services/HOGPUUIDs.swift"; sourceTree = SOURCE_ROOT; };
+		BPF00100000000000000000A /* MacroStorageService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "MacroStorageService.swift"; path = "BluePad/Services/MacroStorageService.swift"; sourceTree = SOURCE_ROOT; };
+		BPF00100000000000000000B /* MouseMotionProcessor.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "MouseMotionProcessor.swift"; path = "BluePad/Services/MouseMotionProcessor.swift"; sourceTree = SOURCE_ROOT; };
+		BPF00100000000000000000C /* SpeechDictationService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "SpeechDictationService.swift"; path = "BluePad/Services/SpeechDictationService.swift"; sourceTree = SOURCE_ROOT; };
+		BPF00100000000000000000D /* BarcodeScannerSheet.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "BarcodeScannerSheet.swift"; path = "BluePad/Views/BarcodeScannerSheet.swift"; sourceTree = SOURCE_ROOT; };
+		BPF00100000000000000000E /* ConnectionSettingsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ConnectionSettingsView.swift"; path = "BluePad/Views/ConnectionSettingsView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF00100000000000000000F /* KeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "KeyboardView.swift"; path = "BluePad/Views/KeyboardView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000010 /* RemotePresenterView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "RemotePresenterView.swift"; path = "BluePad/Views/RemotePresenterView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000011 /* StatusHeaderBar.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "StatusHeaderBar.swift"; path = "BluePad/Views/StatusHeaderBar.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000012 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Theme.swift"; path = "BluePad/Views/Theme.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000013 /* ToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ToolsView.swift"; path = "BluePad/Views/ToolsView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000014 /* TrackpadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "TrackpadView.swift"; path = "BluePad/Views/TrackpadView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000016 /* WiFiHIDTransportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "WiFiHIDTransportService.swift"; path = "BluePad/Services/WiFiHIDTransportService.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000017 /* GamepadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "GamepadView.swift"; path = "BluePad/Views/GamepadView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000018 /* FullPCKeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "FullPCKeyboardView.swift"; path = "BluePad/Views/FullPCKeyboardView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF002000000000000000015 /* BluePadCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "BluePadCoreTests.swift"; path = "BluePadTests/BluePadCoreTests.swift"; sourceTree = SOURCE_ROOT; };
+		BPA001000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = "Assets.xcassets"; path = "BluePad/Resources/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
+		BPA003000000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info.plist"; path = "BluePad/Resources/Info.plist"; sourceTree = SOURCE_ROOT; };
+		BPA004000000000000000001 /* BluePad.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = BluePad.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		BPA005000000000000000001 /* BluePadTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = BluePadTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+/* End PBXFileReference section */
+
+/* Begin PBXFrameworksBuildPhase section */
+		BPD001000000000000000003 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BPD002000000000000000002 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXFrameworksBuildPhase section */
+
+/* Begin PBXGroup section */
+		BPC000000000000000000001 = {
+			isa = PBXGroup;
+			children = (
+				BPC000000000000000000002 /* BluePad */,
+				BPC001000000000000000006 /* BluePadTests */,
+				BPC000000000000000000003 /* Products */,
+			);
+			sourceTree = "<group>";
+		};
+		BPC000000000000000000002 /* BluePad */ = {
+			isa = PBXGroup;
+			children = (
+				BPC001000000000000000001 /* App */,
+				BPC001000000000000000002 /* Models */,
+				BPC001000000000000000003 /* Services */,
+				BPC001000000000000000004 /* Views */,
+				BPC001000000000000000005 /* Resources */,
+			);
+			name = BluePad;
+			sourceTree = "<group>";
+		};
+		BPC001000000000000000001 /* App */ = {
+			isa = PBXGroup;
+			children = (
+				BPF001000000000000000001 /* AppViewModel.swift */,
+				BPF001000000000000000002 /* BluePadApp.swift */,
+			);
+			name = App;
+			sourceTree = "<group>";
+		};
+		BPC001000000000000000002 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				BPF001000000000000000003 /* AppSettingsAndMacros.swift */,
+				BPF001000000000000000004 /* HIDModels.swift */,
+				BPF001000000000000000005 /* KeyboardLayout.swift */,
+			);
+			name = Models;
+			sourceTree = "<group>";
+		};
+		BPC001000000000000000003 /* Services */ = {
+			isa = PBXGroup;
+			children = (
+				BPF001000000000000000006 /* AirMouseMotionService.swift */,
+				BPF001000000000000000007 /* BLEHIDPeripheralService.swift */,
+				BPF001000000000000000008 /* HIDReportMap.swift */,
+				BPF001000000000000000009 /* HOGPUUIDs.swift */,
+				BPF00100000000000000000A /* MacroStorageService.swift */,
+				BPF00100000000000000000B /* MouseMotionProcessor.swift */,
+				BPF00100000000000000000C /* SpeechDictationService.swift */,
+				BPF001000000000000000016 /* WiFiHIDTransportService.swift */,
+			);
+			name = Services;
+			sourceTree = "<group>";
+		};
+		BPC001000000000000000004 /* Views */ = {
+			isa = PBXGroup;
+			children = (
+				BPF00100000000000000000D /* BarcodeScannerSheet.swift */,
+				BPF00100000000000000000E /* ConnectionSettingsView.swift */,
+				BPF001000000000000000018 /* FullPCKeyboardView.swift */,
+				BPF001000000000000000017 /* GamepadView.swift */,
+				BPF00100000000000000000F /* KeyboardView.swift */,
+				BPF001000000000000000010 /* RemotePresenterView.swift */,
+				BPF001000000000000000011 /* StatusHeaderBar.swift */,
+				BPF001000000000000000012 /* Theme.swift */,
+				BPF001000000000000000013 /* ToolsView.swift */,
+				BPF001000000000000000014 /* TrackpadView.swift */,
+			);
+			name = Views;
+			sourceTree = "<group>";
+		};
+		BPC001000000000000000005 /* Resources */ = {
+			isa = PBXGroup;
+			children = (
+				BPA001000000000000000001 /* Assets.xcassets */,
+				BPA003000000000000000001 /* Info.plist */,
+			);
+			name = Resources;
+			sourceTree = "<group>";
+		};
+		BPC001000000000000000006 /* BluePadTests */ = {
+			isa = PBXGroup;
+			children = (
+				BPF002000000000000000015 /* BluePadCoreTests.swift */,
+			);
+			name = BluePadTests;
+			sourceTree = "<group>";
+		};
+		BPC000000000000000000003 /* Products */ = {
+			isa = PBXGroup;
+			children = (
+				BPA004000000000000000001 /* BluePad.app */,
+				BPA005000000000000000001 /* BluePadTests.xctest */,
+			);
+			name = Products;
+			sourceTree = "<group>";
+		};
+/* End PBXGroup section */
+
+/* Begin PBXNativeTarget section */
+		BPE001000000000000000001 /* BluePad */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BPF200000000000000000001 /* Build configuration list for PBXNativeTarget "BluePad" */;
+			buildPhases = (
+				BPD001000000000000000001 /* Sources */,
+				BPD001000000000000000002 /* Resources */,
+				BPD001000000000000000003 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = BluePad;
+			productName = BluePad;
+			productReference = BPA004000000000000000001 /* BluePad.app */;
+			productType = "com.apple.product-type.application";
+		};
+		BPE002000000000000000001 /* BluePadTests */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = BPF300000000000000000001 /* Build configuration list for PBXNativeTarget "BluePadTests" */;
+			buildPhases = (
+				BPD002000000000000000001 /* Sources */,
+				BPD002000000000000000002 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+				BPE011000000000000000001 /* PBXTargetDependency */,
+			);
+			name = BluePadTests;
+			productName = BluePadTests;
+			productReference = BPA005000000000000000001 /* BluePadTests.xctest */;
+			productType = "com.apple.product-type.bundle.unit-test";
+		};
+/* End PBXNativeTarget section */
+
+/* Begin PBXProject section */
+		BPE000000000000000000001 /* Project object */ = {
+			isa = PBXProject;
+			attributes = {
+				BuildIndependentTargetsInParallel = 1;
+				LastSwiftUpdateCheck = 1600;
+				LastUpgradeCheck = 1600;
+			};
+			buildConfigurationList = BPF100000000000000000001 /* Build configuration list for PBXProject "BluePad" */;
+			compatibilityVersion = "Xcode 14.0";
+			developmentRegion = tr;
+			hasScannedForEncodings = 0;
+			knownRegions = (
+				tr,
+				en,
+				Base,
+			);
+			mainGroup = BPC000000000000000000001;
+			productRefGroup = BPC000000000000000000003 /* Products */;
+			projectDirPath = "";
+			projectRoot = "";
+			targets = (
+				BPE001000000000000000001 /* BluePad */,
+				BPE002000000000000000001 /* BluePadTests */,
+			);
+		};
+/* End PBXProject section */
+
+/* Begin PBXResourcesBuildPhase section */
+		BPD001000000000000000002 /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BPA002000000000000000001 /* Assets.xcassets in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXResourcesBuildPhase section */
+
+/* Begin PBXSourcesBuildPhase section */
+		BPD001000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BPB001000000000000000001 /* AppViewModel.swift in Sources */,
+				BPB001000000000000000002 /* BluePadApp.swift in Sources */,
+				BPB001000000000000000003 /* AppSettingsAndMacros.swift in Sources */,
+				BPB001000000000000000004 /* HIDModels.swift in Sources */,
+				BPB001000000000000000005 /* KeyboardLayout.swift in Sources */,
+				BPB001000000000000000006 /* AirMouseMotionService.swift in Sources */,
+				BPB001000000000000000007 /* BLEHIDPeripheralService.swift in Sources */,
+				BPB001000000000000000008 /* HIDReportMap.swift in Sources */,
+				BPB001000000000000000009 /* HOGPUUIDs.swift in Sources */,
+				BPB00100000000000000000A /* MacroStorageService.swift in Sources */,
+				BPB00100000000000000000B /* MouseMotionProcessor.swift in Sources */,
+				BPB00100000000000000000C /* SpeechDictationService.swift in Sources */,
+				BPB00100000000000000000D /* BarcodeScannerSheet.swift in Sources */,
+				BPB00100000000000000000E /* ConnectionSettingsView.swift in Sources */,
+				BPB00100000000000000000F /* KeyboardView.swift in Sources */,
+				BPB001000000000000000010 /* RemotePresenterView.swift in Sources */,
+				BPB001000000000000000011 /* StatusHeaderBar.swift in Sources */,
+				BPB001000000000000000012 /* Theme.swift in Sources */,
+				BPB001000000000000000013 /* ToolsView.swift in Sources */,
+				BPB001000000000000000014 /* TrackpadView.swift in Sources */,
+				BPB001000000000000000016 /* WiFiHIDTransportService.swift in Sources */,
+				BPB001000000000000000017 /* GamepadView.swift in Sources */,
+				BPB001000000000000000018 /* FullPCKeyboardView.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BPD002000000000000000001 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				BPB002000000000000000015 /* BluePadCoreTests.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+/* End PBXSourcesBuildPhase section */
+
+/* Begin PBXTargetDependency section */
+		BPE011000000000000000001 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = BPE001000000000000000001 /* BluePad */;
+			targetProxy = BPE010000000000000000001 /* PBXContainerItemProxy */;
+		};
+/* End PBXTargetDependency section */
+
+/* Begin XCBuildConfiguration section */
+		BPF101000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_TESTABILITY = YES;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				ONLY_ACTIVE_ARCH = YES;
+				SDKROOT = iphoneos;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+			};
+			name = Debug;
+		};
+		BPF102000000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ALWAYS_SEARCH_USER_PATHS = NO;
+				CLANG_ENABLE_MODULES = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				ENABLE_NS_ASSERTIONS = NO;
+				ENABLE_USER_SCRIPT_SANDBOXING = YES;
+				IPHONEOS_DEPLOYMENT_TARGET = 17.0;
+				MARKETING_VERSION = 1.0.0;
+				SDKROOT = iphoneos;
+				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_VERSION = 5.9;
+				TARGETED_DEVICE_FAMILY = "1,2";
+				VALIDATE_PRODUCT = YES;
+			};
+			name = Release;
+		};
+		BPF201000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BluePad/Resources/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bluepad.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+			};
+			name = Debug;
+		};
+		BPF202000000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				GENERATE_INFOPLIST_FILE = NO;
+				INFOPLIST_FILE = BluePad/Resources/Info.plist;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bluepad.ios;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				SUPPORTS_MACCATALYST = NO;
+			};
+			name = Release;
+		};
+		BPF301000000000000000001 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bluepad.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BluePad.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BluePad";
+			};
+			name = Debug;
+		};
+		BPF302000000000000000001 /* Release */ = {
+			isa = XCBuildConfiguration;
+			buildSettings = {
+				BUNDLE_LOADER = "$(TEST_HOST)";
+				GENERATE_INFOPLIST_FILE = YES;
+				PRODUCT_BUNDLE_IDENTIFIER = com.bluepad.ios.tests;
+				PRODUCT_NAME = "$(TARGET_NAME)";
+				TEST_HOST = "$(BUILT_PRODUCTS_DIR)/BluePad.app/$(BUNDLE_EXECUTABLE_FOLDER_PATH)/BluePad";
+			};
+			name = Release;
+		};
+/* End XCBuildConfiguration section */
+
+/* Begin XCConfigurationList section */
+		BPF100000000000000000001 /* Build configuration list for PBXProject "BluePad" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				BPF101000000000000000001 /* Debug */,
+				BPF102000000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BPF200000000000000000001 /* Build configuration list for PBXNativeTarget "BluePad" */ = {
+			isa = PBXConfigurationList;
+			buildConfigurations = (
+				BPF201000000000000000001 /* Debug */,
+				BPF202000000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+		BPF300000000000000000001 /* Build configuration list for PBXNativeTarget "BluePadTests" */ = {
+			isa = PBXConfigurationList;
+			buildConfigurations = (
+				BPF301000000000000000001 /* Debug */,
+				BPF302000000000000000001 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Release;
+		};
+/* End XCConfigurationList section */
+	};
+	rootObject = BPE000000000000000000001 /* Project object */;
+}
