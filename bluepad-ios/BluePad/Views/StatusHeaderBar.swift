@@ -5,6 +5,9 @@ struct StatusHeaderBar: View {
     @State private var pulse = false
 
     private var statusColor: Color {
+        if viewModel.isAnyTransportConnected {
+            return BluePadTheme.accentMint
+        }
         switch viewModel.connectionState {
         case .connected:
             return BluePadTheme.accentMint
@@ -25,7 +28,7 @@ struct StatusHeaderBar: View {
             } label: {
                 HStack(spacing: 8) {
                     ZStack {
-                        if viewModel.connectionState == .advertising {
+                        if viewModel.connectionState == .advertising && !viewModel.isAnyTransportConnected {
                             Circle()
                                 .fill(statusColor.opacity(0.35))
                                 .frame(width: 16, height: 16)
@@ -37,7 +40,7 @@ struct StatusHeaderBar: View {
                             .frame(width: 9, height: 9)
                     }
                     VStack(alignment: .leading, spacing: 1) {
-                        Text(viewModel.connectionState.statusText)
+                        Text(viewModel.combinedStatusText)
                             .font(.caption.weight(.bold))
                             .foregroundStyle(BluePadTheme.textPrimary)
                             .lineLimit(1)

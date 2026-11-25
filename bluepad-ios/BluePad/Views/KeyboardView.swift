@@ -6,6 +6,7 @@ struct KeyboardView: View {
 
     enum DeckSegment: String, CaseIterable, Identifiable {
         case standard = "Standart"
+        case fullPC = "Tam PC"
         case function = "F1-F12"
         case numpad = "Numpad"
         case shortcuts = "Kısayol"
@@ -226,6 +227,8 @@ struct KeyboardView: View {
                 switch selectedSegment {
                 case .standard:
                     standardAndArrowsDeck
+                case .fullPC:
+                    FullPCKeyboardView(viewModel: viewModel)
                 case .function:
                     functionKeysDeck
                 case .numpad:

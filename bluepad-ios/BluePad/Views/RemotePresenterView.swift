@@ -6,6 +6,7 @@ struct RemotePresenterView: View {
     enum RemoteMode: String, CaseIterable, Identifiable {
         case mediaTV = "Medya & TV"
         case presenter = "Sunum"
+        case gamepad = "Gamepad"
 
         var id: String { rawValue }
     }
@@ -25,10 +26,13 @@ struct RemotePresenterView: View {
                 }
                 .pickerStyle(.segmented)
 
-                if mode == .mediaTV {
+                switch mode {
+                case .mediaTV:
                     mediaAndTVSection
-                } else {
+                case .presenter:
                     presenterSection
+                case .gamepad:
+                    GamepadView(viewModel: viewModel)
                 }
             }
             .padding(14)

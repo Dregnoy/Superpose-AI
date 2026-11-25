@@ -5,23 +5,30 @@ struct ConnectionSettingsView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var nameDraft: String = ""
     @State private var onlyNamedHosts: Bool = true
+    @State private var wifiHostDraft: String = ""
+    @State private var wifiPortDraft: String = "8765"
+    @State private var wifiPINDraft: String = ""
+    @State private var testFeedbackWorking: Bool? = nil
 
     var body: some View {
         ScrollView {
             VStack(spacing: 14) {
-                // 1. Bluetooth Broadcast & Identity Card
+                // 1. Local Wi-Fi / LAN Zero-Cloud Transport (Guaranteed PC Mode)
+                wifiConnectionCard
+
+                // 2. Bluetooth Broadcast & Identity Card + Test Wizard
                 bluetoothControlCard
 
-                // 2. Outbound BLE Host Scanner (Connect from iPhone)
+                // 3. Outbound BLE Host Scanner (Connect from iPhone)
                 nearbyHostsCard
 
-                // 3. Step-by-Step Pairing Guides
+                // 4. Step-by-Step Pairing Guides
                 pairingGuidesCard
 
-                // 4. Trackpad, Keyboard & Haptics Preferences
+                // 5. Trackpad, Keyboard & Haptics Preferences
                 preferencesCard
 
-                // 5. Live HID Protocol Diagnostic Log
+                // 6. Live HID Protocol Diagnostic Log
                 diagnosticsCard
             }
             .padding(14)
@@ -29,7 +36,138 @@ struct ConnectionSettingsView: View {
         .background(BluePadTheme.bgPrimary)
         .onAppear {
             nameDraft = viewModel.settings.advertisedName
+            if wifiHostDraft.isEmpty, let first = viewModel.wifiHosts.first {
+                wifiHostDraft = first.host
+                wifiPortDraft = "\(first.port)"
+            }
         }
+    }
+
+    // MARK: Local Wi-Fi / LAN Transport Card
+
+    private var wifiConnectionCard: some View {
+        VStack(alignment: .leading, spacing: 11) {
+            HStack {
+                Label("Wi-Fi Yerel Ağ (Garantili PC Modu)", systemImage: "wifi")
+                    .font(.subheadline.weight(.bold))
+                    .foregroundStyle(BluePadTheme.accentMint)
+                Spacer()
+                Text(viewModel.wifiState.statusText)
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(viewModel.wifiState.isConnected ? BluePadTheme.accentMint : BluePadTheme.textSecondary)
+                    .lineLimit(1)
+            }
+
+            Text("iOS Klasik Bluetooth HID desteklemediği için Windows/Mac/Linux bilgisayarda tools/bluepad_receiver.py çalıştırıp aynı Wi-Fi'den sıfır bulut ile bağlanabilirsiniz.")
+                .font(.caption2)
+                .foregroundStyle(BluePadTheme.textSecondary)
+
+            if !viewModel.wifiHosts.isEmpty {
+                VStack(alignment: .leading, spacing: 6) {
+                    Text("AĞDA BULUNAN BİLGİSAYARLAR")
+                        .font(.system(size: 10, weight: .bold))
+                        .foregroundStyle(BluePadTheme.textSecondary)
+
+                    ForEach(viewModel.wifiHosts) { endpoint in
+                        Button {
+                            wifiHostDraft = endpoint.host
+                            wifiPortDraft = "\(endpoint.port)"
+                            viewModel.triggerHaptic(.light)
+                            viewModel.showToast("Seçildi: \(endpoint.host):\(endpoint.port) — PIN girip Bağlan'a basın")
+                        } label: {
+                            HStack {
+                                Image(systemName: "desktopcomputer")
+                                    .foregroundStyle(BluePadTheme.accentCyan)
+                                VStack(alignment: .leading, spacing: 1) {
+                                    Text(endpoint.name)
+                                        .font(.caption.weight(.bold))
+                                        .foregroundStyle(BluePadTheme.textPrimary)
+                                    Text("\(endpoint.host):\(endpoint.port) · \(endpoint.osName)")
+                                        .font(.system(size: 10, design: .monospaced))
+                                        .foregroundStyle(BluePadTheme.textSecondary)
+                                }
+                                Spacer()
+                                Text("Seç")
+                                    .font(.caption2.weight(.bold))
+                                    .foregroundStyle(BluePadTheme.accentCyan)
+                            }
+                            .padding(9)
+                            .background(RoundedRectangle(cornerRadius: 9).fill(BluePadTheme.bgPrimary))
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+
+            HStack(spacing: 8) {
+                TextField("PC IP (örn. 192.168.1.25)", text: $wifiHostDraft)
+                    .textFieldStyle(.plain)
+                    .keyboardType(.decimalPad)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(BluePadTheme.bgPrimary))
+                    .foregroundStyle(.white)
+                    .font(.caption.monospaced())
+
+                TextField("Port", text: $wifiPortDraft)
+                    .textFieldStyle(.plain)
+                    .keyboardType(.numberPad)
+                    .frame(width: 62)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(BluePadTheme.bgPrimary))
+                    .foregroundStyle(.white)
+                    .font(.caption.monospaced())
+
+                TextField("PIN", text: $wifiPINDraft)
+                    .textFieldStyle(.plain)
+                    .keyboardType(.numberPad)
+                    .frame(width: 64)
+                    .padding(.horizontal, 8)
+                    .padding(.vertical, 8)
+                    .background(RoundedRectangle(cornerRadius: 9).fill(BluePadTheme.bgPrimary))
+                    .foregroundStyle(.white)
+                    .font(.caption.monospaced())
+            }
+
+            HStack(spacing: 10) {
+                Button {
+                    if viewModel.wifiState.isConnected {
+                        viewModel.disconnectWiFi()
+                    } else {
+                        let port = UInt16(wifiPortDraft.trimmingCharacters(in: .whitespaces)) ?? WiFiHIDTransportService.defaultTCPPort
+                        viewModel.connectWiFi(host: wifiHostDraft, port: port, pin: wifiPINDraft)
+                    }
+                } label: {
+                    Label(
+                        viewModel.wifiState.isConnected ? "Wi-Fi Kes" : "Wi-Fi Bağlan",
+                        systemImage: viewModel.wifiState.isConnected ? "wifi.slash" : "wifi"
+                    )
+                    .font(.caption.weight(.bold))
+                    .foregroundStyle(viewModel.wifiState.isConnected ? .white : BluePadTheme.bgPrimary)
+                    .frame(maxWidth: .infinity)
+                    .frame(height: 40)
+                }
+                .buttonStyle(
+                    KeycapButtonStyle(
+                        fill: viewModel.wifiState.isConnected ? BluePadTheme.accentRose : BluePadTheme.accentMint,
+                        border: BluePadTheme.borderSubtle
+                    )
+                )
+
+                Button {
+                    viewModel.isScannerPresented = true
+                } label: {
+                    Label("QR Bağlan", systemImage: "qrcode.viewfinder")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(BluePadTheme.accentCyan)
+                        .padding(.horizontal, 14)
+                        .frame(height: 40)
+                }
+                .buttonStyle(KeycapButtonStyle(fill: BluePadTheme.bgPrimary, border: BluePadTheme.accentCyan.opacity(0.4)))
+            }
+        }
+        .glassCard()
     }
 
     // MARK: Bluetooth Control Card
@@ -158,6 +296,63 @@ struct ConnectionSettingsView: View {
                 }
                 .buttonStyle(KeycapButtonStyle(fill: BluePadTheme.bgPrimary, border: BluePadTheme.accentCyan.opacity(0.35)))
             }
+
+            // Interactive Connection Test Wizard
+            VStack(alignment: .leading, spacing: 8) {
+                HStack {
+                    Label("Bağlantı Testi (İmleç Hareketi)", systemImage: "cursorarrow.motionlines")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(BluePadTheme.accentAmber)
+                    Spacer()
+                    Button("Test Gönder") {
+                        viewModel.runConnectionTestPulse()
+                    }
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(BluePadTheme.bgPrimary)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(Capsule().fill(BluePadTheme.accentAmber))
+                    .buttonStyle(.plain)
+                }
+
+                HStack(spacing: 8) {
+                    Button {
+                        testFeedbackWorking = true
+                    } label: {
+                        Text("Evet, Çalışıyor")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(testFeedbackWorking == true ? BluePadTheme.bgPrimary : BluePadTheme.accentMint)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(testFeedbackWorking == true ? BluePadTheme.accentMint : BluePadTheme.bgElevated))
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        testFeedbackWorking = false
+                    } label: {
+                        Text("Hareket Etmiyor")
+                            .font(.caption2.weight(.bold))
+                            .foregroundStyle(testFeedbackWorking == false ? .white : BluePadTheme.accentRose)
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 6)
+                            .background(RoundedRectangle(cornerRadius: 8).fill(testFeedbackWorking == false ? BluePadTheme.accentRose : BluePadTheme.bgElevated))
+                    }
+                    .buttonStyle(.plain)
+                }
+
+                if testFeedbackWorking == true {
+                    Text("Harika! Artık Trackpad, Klavye, Kumanda ve Gamepad sekmelerini kullanabilirsiniz.")
+                        .font(.caption2)
+                        .foregroundStyle(BluePadTheme.accentMint)
+                } else if testFeedbackWorking == false {
+                    Text("Paket gönderildi = 0 ise önce iki taraftan eşleşmeyi 'Unut' yapıp tekrar eşleştirin veya üstteki Wi-Fi Yerel Ağ modunu kullanın; paket > 0 ama hareket yoksa 'GATT Yenile'ye basın.")
+                        .font(.caption2)
+                        .foregroundStyle(BluePadTheme.textSecondary)
+                }
+            }
+            .padding(10)
+            .background(RoundedRectangle(cornerRadius: 10).fill(BluePadTheme.bgPrimary))
         }
         .glassCard()
     }
@@ -233,9 +428,18 @@ struct ConnectionSettingsView: View {
                                     .lineLimit(1)
 
                                 HStack(spacing: 6) {
-                                    Text("\(host.rssi) dBm")
+                                    Text("\(host.proximityLabel) · \(host.rssi) dBm")
                                         .font(.system(size: 10, design: .monospaced))
                                         .foregroundStyle(BluePadTheme.textSecondary)
+
+                                    if let mfg = host.manufacturerName {
+                                        Text(mfg)
+                                            .font(.system(size: 9, weight: .bold))
+                                            .foregroundStyle(BluePadTheme.accentViolet)
+                                            .padding(.horizontal, 5)
+                                            .padding(.vertical, 1)
+                                            .background(RoundedRectangle(cornerRadius: 4).fill(BluePadTheme.accentViolet.opacity(0.16)))
+                                    }
 
                                     if host.isSystemConnected && !host.linkState.isConnected {
                                         Text("Sistem / Eşli")
@@ -410,6 +614,12 @@ struct ConnectionSettingsView: View {
                 .font(.caption.weight(.semibold))
                 .tint(BluePadTheme.accentCyan)
             Toggle("Dokunsal Geri Bildirim (Haptik)", isOn: $viewModel.settings.hapticsEnabled)
+                .font(.caption.weight(.semibold))
+                .tint(BluePadTheme.accentCyan)
+            Toggle("Fare Butonlarını Üstte Göster", isOn: $viewModel.settings.touchpadButtonsOnTop)
+                .font(.caption.weight(.semibold))
+                .tint(BluePadTheme.accentCyan)
+            Toggle("Kenar Kaydırma Şeridi", isOn: $viewModel.settings.showScrollStrip)
                 .font(.caption.weight(.semibold))
                 .tint(BluePadTheme.accentCyan)
         }

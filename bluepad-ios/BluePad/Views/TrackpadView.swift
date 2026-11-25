@@ -42,6 +42,14 @@ struct TrackpadView: View {
                     ) {
                         viewModel.toggleJiggler()
                     }
+
+                    quickChip(
+                        title: "Tam Ekran",
+                        icon: "arrow.up.left.and.arrow.down.right"
+                    ) {
+                        viewModel.triggerHaptic(.light)
+                        viewModel.isFullScreenTrackpad = true
+                    }
                 }
                 .padding(.horizontal, 14)
             }
@@ -88,7 +96,30 @@ struct TrackpadView: View {
                 .padding(.horizontal, 14)
             }
 
-            // Multi-touch Trackpad Surface
+            if viewModel.settings.touchpadButtonsOnTop {
+                mouseButtonsRow
+                    .padding(.horizontal, 14)
+                trackpadSurfaceSection
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+            } else {
+                trackpadSurfaceSection
+                    .padding(.horizontal, 14)
+                    .frame(maxWidth: .infinity, maxHeight: .infinity)
+                mouseButtonsRow
+                    .padding(.horizontal, 14)
+                    .padding(.bottom, 10)
+            }
+        }
+        .background(BluePadTheme.bgPrimary)
+        .fullScreenCover(isPresented: $viewModel.isFullScreenTrackpad) {
+            FullScreenTrackpadModal(viewModel: viewModel)
+        }
+    }
+
+    private var trackpadSurfaceSection: some View {
+        HStack(spacing: 8) {
             ZStack {
                 TrackpadSurfaceRepresentable(
                     tapToClickEnabled: viewModel.settings.tapToClick,
@@ -148,40 +179,47 @@ struct TrackpadView: View {
                 .padding(14)
                 .allowsHitTesting(false)
             }
-            .padding(.horizontal, 14)
-            .frame(maxWidth: .infinity, maxHeight: .infinity)
 
-            // Tactile Left / Middle / Right Mouse Buttons
-            HStack(spacing: 10) {
-                HoldableMouseButton(
-                    title: "Sol Tık",
-                    isActive: viewModel.pressedButtons.contains(.left),
-                    accent: BluePadTheme.accentCyan
-                ) { pressed in
-                    viewModel.setMouseButton(.left, pressed: pressed)
-                }
-
-                HoldableMouseButton(
-                    title: "Orta",
-                    isActive: viewModel.pressedButtons.contains(.middle),
-                    accent: BluePadTheme.accentViolet,
-                    maxWidth: 82
-                ) { pressed in
-                    viewModel.setMouseButton(.middle, pressed: pressed)
-                }
-
-                HoldableMouseButton(
-                    title: "Sağ Tık",
-                    isActive: viewModel.pressedButtons.contains(.right),
-                    accent: BluePadTheme.accentBlue
-                ) { pressed in
-                    viewModel.setMouseButton(.right, pressed: pressed)
-                }
+            if viewModel.settings.showScrollStrip {
+                VerticalScrollStrip(
+                    onScrollDelta: { dy in
+                        viewModel.handleTrackpadScroll(rawDX: 0, rawDY: dy)
+                    },
+                    onEnd: {
+                        viewModel.resetTrackpadMotion()
+                    }
+                )
             }
-            .padding(.horizontal, 14)
-            .padding(.bottom, 10)
         }
-        .background(BluePadTheme.bgPrimary)
+    }
+
+    private var mouseButtonsRow: some View {
+        HStack(spacing: 10) {
+            HoldableMouseButton(
+                title: "Sol Tık",
+                isActive: viewModel.pressedButtons.contains(.left),
+                accent: BluePadTheme.accentCyan
+            ) { pressed in
+                viewModel.setMouseButton(.left, pressed: pressed)
+            }
+
+            HoldableMouseButton(
+                title: "Orta",
+                isActive: viewModel.pressedButtons.contains(.middle),
+                accent: BluePadTheme.accentViolet,
+                maxWidth: 82
+            ) { pressed in
+                viewModel.setMouseButton(.middle, pressed: pressed)
+            }
+
+            HoldableMouseButton(
+                title: "Sağ Tık",
+                isActive: viewModel.pressedButtons.contains(.right),
+                accent: BluePadTheme.accentBlue
+            ) { pressed in
+                viewModel.setMouseButton(.right, pressed: pressed)
+            }
+        }
     }
 
     private func quickChip(
@@ -253,6 +291,134 @@ private struct HoldableMouseButton: View {
                         }
                     }
             )
+    }
+}
+
+private struct VerticalScrollStrip: View {
+    let onScrollDelta: (Double) -> Void
+    let onEnd: () -> Void
+
+    @State private var lastY: CGFloat?
+
+    var body: some View {
+        VStack(spacing: 6) {
+            Image(systemName: "chevron.up")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(BluePadTheme.textSecondary)
+            Spacer()
+            RoundedRectangle(cornerRadius: 2)
+                .fill(BluePadTheme.accentCyan.opacity(0.45))
+                .frame(width: 4, height: 34)
+            Spacer()
+            Image(systemName: "chevron.down")
+                .font(.system(size: 10, weight: .bold))
+                .foregroundStyle(BluePadTheme.textSecondary)
+        }
+        .padding(.vertical, 12)
+        .frame(width: 28)
+        .frame(maxHeight: .infinity)
+        .background(
+            RoundedRectangle(cornerRadius: 14, style: .continuous)
+                .fill(BluePadTheme.bgCard)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 14, style: .continuous)
+                        .stroke(BluePadTheme.borderSubtle, lineWidth: 1)
+                )
+        )
+        .gesture(
+            DragGesture(minimumDistance: 0)
+                .onChanged { value in
+                    if let prev = lastY {
+                        let dy = Double(value.location.y - prev)
+                        if abs(dy) > 0.2 {
+                            onScrollDelta(dy)
+                        }
+                    }
+                    lastY = value.location.y
+                }
+                .onEnded { _ in
+                    lastY = nil
+                    onEnd()
+                }
+        )
+    }
+}
+
+private struct FullScreenTrackpadModal: View {
+    @ObservedObject var viewModel: AppViewModel
+
+    var body: some View {
+        VStack(spacing: 10) {
+            HStack(spacing: 8) {
+                TrackpadSurfaceRepresentable(
+                    tapToClickEnabled: viewModel.settings.tapToClick,
+                    onMove: { dx, dy in
+                        viewModel.handleTrackpadMove(rawDX: dx, rawDY: dy)
+                    },
+                    onScroll: { dx, dy in
+                        viewModel.handleTrackpadScroll(rawDX: dx, rawDY: dy)
+                    },
+                    onTapClick: { button in
+                        viewModel.clickMouse(button)
+                    },
+                    onMouseButton: { button, pressed in
+                        viewModel.setMouseButton(button, pressed: pressed)
+                    },
+                    onGestureEnd: {
+                        viewModel.resetTrackpadMotion()
+                    }
+                )
+                .clipShape(RoundedRectangle(cornerRadius: 22, style: .continuous))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                        .stroke(BluePadTheme.borderSubtle, lineWidth: 1.5)
+                )
+
+                if viewModel.settings.showScrollStrip {
+                    VerticalScrollStrip(
+                        onScrollDelta: { dy in
+                            viewModel.handleTrackpadScroll(rawDX: 0, rawDY: dy)
+                        },
+                        onEnd: {
+                            viewModel.resetTrackpadMotion()
+                        }
+                    )
+                }
+            }
+            .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+            HStack(spacing: 10) {
+                HoldableMouseButton(
+                    title: "Sol Tık",
+                    isActive: viewModel.pressedButtons.contains(.left),
+                    accent: BluePadTheme.accentCyan
+                ) { pressed in
+                    viewModel.setMouseButton(.left, pressed: pressed)
+                }
+
+                Button {
+                    viewModel.triggerHaptic(.light)
+                    viewModel.isFullScreenTrackpad = false
+                } label: {
+                    Label("Çık", systemImage: "arrow.down.right.and.arrow.up.left")
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(BluePadTheme.bgPrimary)
+                        .frame(width: 82, height: 54)
+                        .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(BluePadTheme.accentMint))
+                }
+                .buttonStyle(.plain)
+
+                HoldableMouseButton(
+                    title: "Sağ Tık",
+                    isActive: viewModel.pressedButtons.contains(.right),
+                    accent: BluePadTheme.accentBlue
+                ) { pressed in
+                    viewModel.setMouseButton(.right, pressed: pressed)
+                }
+            }
+        }
+        .padding(12)
+        .background(BluePadTheme.bgPrimary.ignoresSafeArea())
     }
 }
 

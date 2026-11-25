@@ -5,6 +5,7 @@ struct ToolsView: View {
     @ObservedObject var viewModel: AppViewModel
     @State private var showMacroEditor = false
     @State private var clipboardPreview: String = ""
+    @State private var selectedCategory: MacroCategory? = nil
 
     var body: some View {
         ScrollView {
@@ -103,13 +104,44 @@ struct ToolsView: View {
 
     // MARK: Custom Macros Grid
 
+    private var filteredMacros: [CustomMacro] {
+        guard let selectedCategory else { return viewModel.macros }
+        return viewModel.macros.filter { $0.category == selectedCategory }
+    }
+
+    private var fullWidthMacros: [CustomMacro] {
+        filteredMacros.filter(\.fullWidth)
+    }
+
+    private var compactMacros: [CustomMacro] {
+        filteredMacros.filter { !$0.fullWidth }
+    }
+
+    private var macroGridColumnsLayout: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 10), count: max(2, min(3, viewModel.settings.macroGridColumns)))
+    }
+
     private var macrosCard: some View {
         VStack(alignment: .leading, spacing: 12) {
             HStack {
-                Label("Özel Makrolar ve Kısayollar", systemImage: "square.grid.2x2.fill")
+                Label("Özel Makrolar ve Düzenler", systemImage: "square.grid.2x2.fill")
                     .font(.subheadline.weight(.bold))
                     .foregroundStyle(BluePadTheme.accentCyan)
                 Spacer()
+
+                Button {
+                    viewModel.settings.macroGridColumns = (viewModel.settings.macroGridColumns == 2 ? 3 : 2)
+                    viewModel.triggerHaptic(.light)
+                } label: {
+                    Text("\(viewModel.settings.macroGridColumns) Sütun")
+                        .font(.caption2.weight(.bold))
+                        .foregroundStyle(BluePadTheme.accentCyan)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 5)
+                        .background(Capsule().fill(BluePadTheme.bgElevated))
+                }
+                .buttonStyle(.plain)
+
                 Menu {
                     Button {
                         showMacroEditor = true
@@ -140,46 +172,84 @@ struct ToolsView: View {
                 .buttonStyle(.plain)
             }
 
-            LazyVGrid(columns: [GridItem(.flexible(), spacing: 10), GridItem(.flexible(), spacing: 10)], spacing: 10) {
-                ForEach(viewModel.macros) { macro in
-                    Button {
-                        viewModel.runMacro(macro)
-                    } label: {
-                        HStack(spacing: 10) {
-                            Image(systemName: macro.sfSymbol)
-                                .font(.headline)
-                                .foregroundStyle(Color(hex: macro.accentHex))
-                                .frame(width: 34, height: 34)
-                                .background(
-                                    RoundedRectangle(cornerRadius: 10, style: .continuous)
-                                        .fill(Color(hex: macro.accentHex).opacity(0.16))
-                                )
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(macro.title)
-                                    .font(.caption.weight(.bold))
-                                    .foregroundStyle(BluePadTheme.textPrimary)
-                                    .lineLimit(1)
-                                Text(macro.subtitle)
-                                    .font(.caption2)
-                                    .foregroundStyle(BluePadTheme.textSecondary)
-                                    .lineLimit(1)
-                            }
-                            Spacer(minLength: 0)
-                        }
-                        .padding(10)
+            // Category Filter Strip
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 6) {
+                    categoryFilterPill(title: "Tümü", category: nil)
+                    ForEach(MacroCategory.allCases) { cat in
+                        categoryFilterPill(title: cat.displayName, category: cat)
                     }
-                    .buttonStyle(KeycapButtonStyle(cornerRadius: 14))
-                    .contextMenu {
-                        Button(role: .destructive) {
-                            viewModel.deleteMacro(id: macro.id)
-                        } label: {
-                            Label("Makroyu Sil", systemImage: "trash")
-                        }
-                    }
+                }
+            }
+
+            // Full-width featured macro tiles
+            ForEach(fullWidthMacros) { macro in
+                macroTileButton(macro)
+            }
+
+            // 2 or 3 column customizable grid
+            LazyVGrid(columns: macroGridColumnsLayout, spacing: 10) {
+                ForEach(compactMacros) { macro in
+                    macroTileButton(macro)
                 }
             }
         }
         .glassCard()
+    }
+
+    private func categoryFilterPill(title: String, category: MacroCategory?) -> some View {
+        let isSelected = (selectedCategory == category)
+        return Button {
+            selectedCategory = category
+            viewModel.triggerHaptic(.light)
+        } label: {
+            Text(title)
+                .font(.caption2.weight(.bold))
+                .foregroundStyle(isSelected ? BluePadTheme.bgPrimary : BluePadTheme.textSecondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 5)
+                .background(
+                    Capsule().fill(isSelected ? BluePadTheme.accentCyan : BluePadTheme.bgPrimary)
+                )
+        }
+        .buttonStyle(.plain)
+    }
+
+    private func macroTileButton(_ macro: CustomMacro) -> some View {
+        Button {
+            viewModel.runMacro(macro)
+        } label: {
+            HStack(spacing: 10) {
+                Image(systemName: macro.sfSymbol)
+                    .font(.headline)
+                    .foregroundStyle(Color(hex: macro.accentHex))
+                    .frame(width: 34, height: 34)
+                    .background(
+                        RoundedRectangle(cornerRadius: 10, style: .continuous)
+                            .fill(Color(hex: macro.accentHex).opacity(0.16))
+                    )
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(macro.title)
+                        .font(.caption.weight(.bold))
+                        .foregroundStyle(BluePadTheme.textPrimary)
+                        .lineLimit(1)
+                    Text(macro.subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(BluePadTheme.textSecondary)
+                        .lineLimit(1)
+                }
+                Spacer(minLength: 0)
+            }
+            .padding(10)
+        }
+        .buttonStyle(KeycapButtonStyle(cornerRadius: 14))
+        .contextMenu {
+            Button(role: .destructive) {
+                viewModel.deleteMacro(id: macro.id)
+            } label: {
+                Label("Makroyu Sil", systemImage: "trash")
+            }
+        }
     }
 
     // MARK: QR & Barcode Scanner
@@ -394,6 +464,7 @@ private struct MacroEditorSheet: View {
         case typeText = "Metin Yaz"
         case consumer = "Medya Tuşu"
         case system = "Sistem"
+        case sequence = "Çoklu Adım"
 
         var id: String { rawValue }
     }
@@ -401,6 +472,7 @@ private struct MacroEditorSheet: View {
     @State private var title: String = ""
     @State private var subtitle: String = ""
     @State private var category: MacroCategory = .custom
+    @State private var fullWidth: Bool = false
     @State private var selectedSymbol: String = "bolt.fill"
     @State private var selectedHex: String = "#38BDF8"
     @State private var actionKind: ActionKind = .keyCombo
@@ -420,6 +492,9 @@ private struct MacroEditorSheet: View {
     // Consumer / System state
     @State private var selectedConsumer: HIDConsumerUsage = .playPause
     @State private var selectedSystemRaw: UInt8 = HIDSystemUsage.sleep.rawValue
+
+    // Sequence builder state
+    @State private var sequenceSteps: [MacroStep] = []
 
     private let symbolChoices = [
         "bolt.fill", "terminal.fill", "lock.fill", "camera.viewfinder",
@@ -442,6 +517,7 @@ private struct MacroEditorSheet: View {
                             Text(cat.displayName).tag(cat)
                         }
                     }
+                    Toggle("Tam Genişlik Buton", isOn: $fullWidth)
                 }
 
                 Section("Eylem Tipi") {
@@ -450,7 +526,7 @@ private struct MacroEditorSheet: View {
                             Text(kind.rawValue).tag(kind)
                         }
                     }
-                    .pickerStyle(.segmented)
+                    .pickerStyle(.menu)
 
                     switch actionKind {
                     case .keyCombo:
@@ -481,6 +557,62 @@ private struct MacroEditorSheet: View {
                             Text("Uyku (Sleep)").tag(HIDSystemUsage.sleep.rawValue)
                             Text("Uyandır (Wake)").tag(HIDSystemUsage.wakeUp.rawValue)
                             Text("Güç (Power Down)").tag(HIDSystemUsage.powerDown.rawValue)
+                        }
+
+                    case .sequence:
+                        Text("Adım Ekle (\(sequenceSteps.count) adım)")
+                            .font(.caption.weight(.bold))
+                            .foregroundStyle(.secondary)
+
+                        Picker("Kombinasyon Tuşu", selection: $selectedKeyCode) {
+                            ForEach(HIDKeyCode.allCases.filter { $0 != .none }, id: \.self) { code in
+                                Text(code.displayName).tag(code)
+                            }
+                        }
+                        Toggle("Ctrl", isOn: $useCtrl)
+                        Toggle("Shift", isOn: $useShift)
+                        Toggle("Alt", isOn: $useAlt)
+                        Toggle("Win / ⌘", isOn: $useGUI)
+                        Button("Tuş Kombinasyonu Adımı Ekle") {
+                            sequenceSteps.append(.keyCombo(keyCode: selectedKeyCode.rawValue, modifiersRaw: currentComboModifiers().rawValue))
+                        }
+
+                        TextField("Adım metni", text: $textPayload)
+                        Button("Metin Adımı Ekle") {
+                            if !textPayload.isEmpty {
+                                sequenceSteps.append(.typeText(text: textPayload, appendEnter: appendEnter))
+                            }
+                        }
+
+                        Picker("Medya Adımı", selection: $selectedConsumer) {
+                            ForEach(HIDConsumerUsage.allCases.filter { $0 != .none }, id: \.self) { item in
+                                Text(item.displayName).tag(item)
+                            }
+                        }
+                        HStack {
+                            Button("Medya Ekle") {
+                                sequenceSteps.append(.consumerKey(usageRaw: selectedConsumer.rawValue))
+                            }
+                            Spacer()
+                            Button("Bekle 150ms Ekle") {
+                                sequenceSteps.append(.delayMs(150))
+                            }
+                        }
+
+                        if !sequenceSteps.isEmpty {
+                            ForEach(Array(sequenceSteps.enumerated()), id: \.offset) { idx, step in
+                                HStack {
+                                    Text("\(idx + 1). \(step.summaryLabel)")
+                                        .font(.caption)
+                                    Spacer()
+                                    Button(role: .destructive) {
+                                        sequenceSteps.remove(at: idx)
+                                    } label: {
+                                        Image(systemName: "trash")
+                                    }
+                                    .buttonStyle(.plain)
+                                }
+                            }
                         }
                     }
                 }
@@ -533,29 +665,38 @@ private struct MacroEditorSheet: View {
                     Button("Kaydet") {
                         saveMacro()
                     }
-                    .disabled(title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                    .disabled(
+                        title.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                            || (actionKind == .sequence && sequenceSteps.isEmpty)
+                    )
                 }
             }
         }
+    }
+
+    private func currentComboModifiers() -> HIDModifier {
+        var mods: HIDModifier = []
+        if useCtrl { mods.insert(.leftControl) }
+        if useShift { mods.insert(.leftShift) }
+        if useAlt { mods.insert(.leftAlt) }
+        if useAltGr { mods.insert(.rightAlt) }
+        if useGUI { mods.insert(.leftGUI) }
+        return mods
     }
 
     private func saveMacro() {
         let action: MacroAction
         switch actionKind {
         case .keyCombo:
-            var mods: HIDModifier = []
-            if useCtrl { mods.insert(.leftControl) }
-            if useShift { mods.insert(.leftShift) }
-            if useAlt { mods.insert(.leftAlt) }
-            if useAltGr { mods.insert(.rightAlt) }
-            if useGUI { mods.insert(.leftGUI) }
-            action = .keyCombo(keyCode: selectedKeyCode.rawValue, modifiersRaw: mods.rawValue)
+            action = .keyCombo(keyCode: selectedKeyCode.rawValue, modifiersRaw: currentComboModifiers().rawValue)
         case .typeText:
             action = .typeText(text: textPayload, appendEnter: appendEnter)
         case .consumer:
             action = .consumerKey(usageRaw: selectedConsumer.rawValue)
         case .system:
             action = .systemKey(usageRaw: selectedSystemRaw)
+        case .sequence:
+            action = .sequence(steps: sequenceSteps)
         }
 
         let cleanTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -566,6 +707,7 @@ private struct MacroEditorSheet: View {
             sfSymbol: selectedSymbol,
             accentHex: selectedHex,
             category: category,
+            fullWidth: fullWidth,
             action: action
         )
         onSave(macro)
