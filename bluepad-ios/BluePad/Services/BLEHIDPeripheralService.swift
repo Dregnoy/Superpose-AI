@@ -12,18 +12,36 @@ final class BLEHIDPeripheralService: NSObject {
     var onProtocolModeChange: (@MainActor (HIDProtocolMode) -> Void)?
     var onDiagnosticEvent: (@MainActor (HIDDiagnosticEvent) -> Void)?
     var onPacketSent: (@MainActor () -> Void)?
+    var onDiscoveredHostsChange: (@MainActor ([DiscoveredBLEHost]) -> Void)?
+    var onScanningStateChange: (@MainActor (Bool) -> Void)?
+    var onGATTStatusChange: (@MainActor (HOGPServiceStatus) -> Void)?
 
     // MARK: Manager & Advertising State
     private var peripheralManager: CBPeripheralManager?
-    private var permissionCentralManager: CBCentralManager?
+    private var centralManager: CBCentralManager?
     private var hasLoggedPlistCheck: Bool = false
 
     private var advertisedName: String = "BluePad"
     private var shouldAdvertise: Bool = true
+    private var isPublishingServices: Bool = false
     private var servicesPublished: Bool = false
     private var hidServicePublished: Bool = false
     private var usingFallbackAdvertising: Bool = false
-    private var pendingServicesToAdd: [CBMutableService] = []
+    private var hidRetryWithoutIncludedBattery: Bool = false
+
+    private var batteryServiceObj: CBMutableService?
+    private var deviceInfoServiceObj: CBMutableService?
+    private var hidServiceObj: CBMutableService?
+    private var serviceChangedDummyObj: CBMutableService?
+    private var gattStatus = HOGPServiceStatus()
+
+    // MARK: Outbound BLE Host Scanner & Link State
+    private var discoveredPeripherals: [UUID: CBPeripheral] = [:]
+    private var discoveredHosts: [UUID: DiscoveredBLEHost] = [:]
+    private var isScanningHosts: Bool = false
+    private var pendingHostScan: Bool = false
+    private var scanTimeoutWorkItem: DispatchWorkItem?
+    private var lastHostEmitUptime: TimeInterval = 0
 
     private var currentProtocolMode: HIDProtocolMode = .report
     private var currentBatteryLevel: UInt8 = 100
@@ -94,9 +112,9 @@ final class BLEHIDPeripheralService: NSObject {
             let initializeManagers: () -> Void = { [weak self] in
                 guard let self else { return }
 
-                if CBManager.authorization == .notDetermined || self.permissionCentralManager == nil {
-                    self.emitLog(.ble, "CBCentralManager izin tetikleyici başlatılıyor...")
-                    self.permissionCentralManager = CBCentralManager(
+                if CBManager.authorization == .notDetermined || self.centralManager == nil {
+                    self.emitLog(.ble, "CBCentralManager başlatılıyor (izin ve hedef tarayıcı)...")
+                    self.centralManager = CBCentralManager(
                         delegate: self,
                         queue: nil,
                         options: [CBCentralManagerOptionShowPowerAlertKey: true]
@@ -109,9 +127,16 @@ final class BLEHIDPeripheralService: NSObject {
                     self.emitLog(.ble, "CBPeripheralManager durumu yenileniyor (\(self.stateName(manager.state)))...")
                     self.handleManagerState(manager)
                 } else {
+                    self.isPublishingServices = false
                     self.servicesPublished = false
                     self.hidServicePublished = false
-                    self.pendingServicesToAdd.removeAll()
+                    self.hidRetryWithoutIncludedBattery = false
+                    self.batteryServiceObj = nil
+                    self.deviceInfoServiceObj = nil
+                    self.hidServiceObj = nil
+                    self.serviceChangedDummyObj = nil
+                    self.gattStatus = HOGPServiceStatus()
+                    self.emitGATTStatus()
                     self.peripheralManager?.delegate = nil
                     self.emitState(.initializing)
                     self.emitLog(.ble, "CBPeripheralManager başlatılıyor (ana kuyruk)...")
@@ -142,6 +167,9 @@ final class BLEHIDPeripheralService: NSObject {
                 if manager.isAdvertising {
                     manager.stopAdvertising()
                 }
+                self.gattStatus.isAdvertising = false
+                self.gattStatus.advertisingMode = "Durduruldu"
+                self.emitGATTStatus()
                 self.emitLog(.ble, "Bluetooth yayını durduruldu.")
                 if manager.state == .poweredOn {
                     self.emitState(.stopped)
@@ -149,6 +177,9 @@ final class BLEHIDPeripheralService: NSObject {
                     self.updateConnectionState(from: manager)
                 }
             } else {
+                self.gattStatus.isAdvertising = false
+                self.gattStatus.advertisingMode = "Durduruldu"
+                self.emitGATTStatus()
                 self.emitState(.stopped)
             }
         }
@@ -167,9 +198,193 @@ final class BLEHIDPeripheralService: NSObject {
             }
             if self.servicesPublished && self.hidServicePublished {
                 self.beginAdvertising(on: manager)
-            } else if self.pendingServicesToAdd.isEmpty {
+            } else if !self.isPublishingServices {
                 self.setupServicesSequentially(on: manager)
             }
+        }
+    }
+
+    func ensureAdvertisingOnForeground() {
+        runOnMain { [weak self] in
+            guard let self else { return }
+            guard self.shouldAdvertise,
+                  self.servicesPublished,
+                  self.hidServicePublished,
+                  let manager = self.peripheralManager,
+                  manager.state == .poweredOn,
+                  !manager.isAdvertising else { return }
+            self.emitLog(.ble, "Ön plana dönüldü; BLE yayını tazeleniyor...")
+            self.beginAdvertising(on: manager)
+        }
+    }
+
+    func triggerServiceChangedRefresh() {
+        runOnMain { [weak self] in
+            guard let self else { return }
+            guard let manager = self.peripheralManager,
+                  manager.state == .poweredOn,
+                  self.hidServicePublished else { return }
+
+            if let existing = self.serviceChangedDummyObj {
+                manager.remove(existing)
+            }
+
+            let dummyServiceUUID = CBUUID(nsuuid: UUID())
+            let dummyCharUUID = CBUUID(nsuuid: UUID())
+            let dummyChar = CBMutableCharacteristic(
+                type: dummyCharUUID,
+                properties: [.read, .notifyEncryptionRequired],
+                value: nil,
+                permissions: [.readEncryptionRequired]
+            )
+            let triggerService = CBMutableService(type: dummyServiceUUID, primary: true)
+            triggerService.characteristics = [dummyChar]
+            self.serviceChangedDummyObj = triggerService
+            manager.add(triggerService)
+            self.emitLog(.gatt, "GATT Service Changed tetikleniyor...")
+        }
+    }
+
+    // MARK: Outbound BLE Host Scanner & Connector
+
+    func startHostScan() {
+        runOnMain { [weak self] in
+            guard let self else { return }
+
+            if self.centralManager == nil {
+                self.pendingHostScan = true
+                self.emitLog(.ble, "Bluetooth tarama hazırlanıyor (CBCentralManager bekleniyor)...")
+                self.centralManager = CBCentralManager(
+                    delegate: self,
+                    queue: nil,
+                    options: [CBCentralManagerOptionShowPowerAlertKey: true]
+                )
+                return
+            }
+
+            guard let central = self.centralManager else { return }
+            guard central.state == .poweredOn else {
+                self.pendingHostScan = true
+                self.emitLog(.ble, "Tarama beklemede (Central durumu: \(self.stateName(central.state))).")
+                return
+            }
+
+            self.scanTimeoutWorkItem?.cancel()
+            self.pendingHostScan = false
+            self.refreshSystemConnectedHosts(on: central)
+
+            central.scanForPeripherals(
+                withServices: nil,
+                options: [CBCentralManagerScanOptionAllowDuplicatesKey: true]
+            )
+            self.isScanningHosts = true
+            self.emitScanningState(true)
+            self.emitLog(.ble, "Yakındaki Bluetooth cihazları taranıyor...")
+            self.emitDiscoveredHosts(force: true)
+
+            let timeoutItem = DispatchWorkItem { [weak self] in
+                self?.stopHostScan()
+            }
+            self.scanTimeoutWorkItem = timeoutItem
+            DispatchQueue.main.asyncAfter(deadline: .now() + 30.0, execute: timeoutItem)
+        }
+    }
+
+    func stopHostScan() {
+        runOnMain { [weak self] in
+            guard let self else { return }
+            self.scanTimeoutWorkItem?.cancel()
+            self.scanTimeoutWorkItem = nil
+            self.pendingHostScan = false
+            self.centralManager?.stopScan()
+            if self.isScanningHosts {
+                self.isScanningHosts = false
+                self.emitScanningState(false)
+                self.emitLog(.ble, "Cihaz taraması durduruldu.")
+            }
+        }
+    }
+
+    func connectToHost(id: UUID) {
+        runOnMain { [weak self] in
+            guard let self else { return }
+            guard let central = self.centralManager, central.state == .poweredOn else {
+                self.emitLog(.error, "Bağlantı başlatılamadı: Bluetooth tarayıcı hazır değil.")
+                return
+            }
+
+            let peripheral = self.discoveredPeripherals[id] ?? central.retrievePeripherals(withIdentifiers: [id]).first
+            guard let peripheral else {
+                self.emitLog(.error, "Seçilen Bluetooth cihazı bulunamadı.")
+                return
+            }
+
+            self.discoveredPeripherals[id] = peripheral
+            self.stopHostScan()
+
+            let existing = self.discoveredHosts[id]
+            let trimmedPeripheralName = peripheral.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let fallbackName = trimmedPeripheralName.isEmpty ? "BLE Cihazı" : trimmedPeripheralName
+            let displayName = existing?.name ?? fallbackName
+            self.discoveredHosts[id] = DiscoveredBLEHost(
+                id: id,
+                name: displayName,
+                hasExplicitName: existing?.hasExplicitName ?? (peripheral.name?.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false),
+                rssi: existing?.rssi ?? -60,
+                isConnectable: true,
+                isSystemConnected: existing?.isSystemConnected ?? false,
+                linkState: .connecting,
+                lastSeen: Date()
+            )
+            self.emitDiscoveredHosts(force: true)
+            self.emitLog(.ble, "Hedef cihaza bağlanılıyor: \(displayName)...")
+
+            central.connect(peripheral, options: [
+                CBConnectPeripheralOptionNotifyOnDisconnectionKey: true
+            ])
+        }
+    }
+
+    func disconnectFromHost(id: UUID) {
+        runOnMain { [weak self] in
+            guard let self else { return }
+            guard let central = self.centralManager else { return }
+            let peripheral = self.discoveredPeripherals[id] ?? central.retrievePeripherals(withIdentifiers: [id]).first
+            guard let peripheral else { return }
+
+            central.cancelPeripheralConnection(peripheral)
+            if var host = self.discoveredHosts[id] {
+                host.linkState = .discovered
+                self.discoveredHosts[id] = host
+                self.emitDiscoveredHosts(force: true)
+            }
+            self.emitLog(.ble, "Hedef cihaz bağlantısı kesildi.")
+        }
+    }
+
+    private func refreshSystemConnectedHosts(on central: CBCentralManager) {
+        let connected = central.retrieveConnectedPeripherals(withServices: [
+            HOGPUUID.hidService,
+            HOGPUUID.batteryService,
+            HOGPUUID.deviceInformationService
+        ])
+        let now = Date()
+        for peripheral in connected {
+            discoveredPeripherals[peripheral.identifier] = peripheral
+            let trimmed = peripheral.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            let existing = discoveredHosts[peripheral.identifier]
+            let resolvedName = trimmed.isEmpty ? (existing?.name ?? "Sistem Bağlı Cihaz") : trimmed
+            let hasName = !trimmed.isEmpty || (existing?.hasExplicitName ?? false)
+            discoveredHosts[peripheral.identifier] = DiscoveredBLEHost(
+                id: peripheral.identifier,
+                name: resolvedName,
+                hasExplicitName: hasName,
+                rssi: existing?.rssi ?? -50,
+                isConnectable: true,
+                isSystemConnected: true,
+                linkState: existing?.linkState ?? .discovered,
+                lastSeen: now
+            )
         }
     }
 
@@ -315,56 +530,91 @@ final class BLEHIDPeripheralService: NSObject {
         }
     }
 
-    // MARK: GATT Database Construction
+    // MARK: GATT Database Construction (Canonical HOGP: 180F -> 180A -> 1812 with includedServices)
 
-    private func buildServices() -> [CBMutableService] {
-        // 1. HID Service (0x1812) — Registered FIRST so HID binding is guaranteed even if optional services fail.
+    private func buildBatteryService() -> CBMutableService {
+        batteryLevelChar = CBMutableCharacteristic(
+            type: HOGPUUID.batteryLevel,
+            properties: [.read, .notifyEncryptionRequired],
+            value: nil,
+            permissions: [.readEncryptionRequired]
+        )
+        let service = CBMutableService(type: HOGPUUID.batteryService, primary: true)
+        service.characteristics = [batteryLevelChar]
+        return service
+    }
+
+    private func buildDeviceInfoService() -> CBMutableService {
+        manufacturerChar = CBMutableCharacteristic(
+            type: HOGPUUID.manufacturerName,
+            properties: [.read],
+            value: nil,
+            permissions: [.readable]
+        )
+        modelNumberChar = CBMutableCharacteristic(
+            type: HOGPUUID.modelNumber,
+            properties: [.read],
+            value: nil,
+            permissions: [.readable]
+        )
+        pnpIDChar = CBMutableCharacteristic(
+            type: HOGPUUID.pnpID,
+            properties: [.read],
+            value: nil,
+            permissions: [.readable]
+        )
+        let service = CBMutableService(type: HOGPUUID.deviceInformationService, primary: true)
+        service.characteristics = [manufacturerChar, modelNumberChar, pnpIDChar]
+        return service
+    }
+
+    private func buildHIDService(includingBattery battery: CBMutableService?) -> CBMutableService {
         // CoreBluetooth HOGP rules:
-        // - Full 128-bit UUIDs everywhere
+        // - Full 128-bit UUIDs everywhere inside GATT DB
         // - `value: nil` on all characteristics (served dynamically in `didReceiveRead`)
-        // - Combine `.readable`/`.writeable` with encryption permissions explicitly
-        // - Avoid extendedProperties on Protocol Mode, Boot Output, and Output Report
+        // - `.notifyEncryptionRequired` and `.readEncryptionRequired`/`.writeEncryptionRequired` so hosts bond cleanly
+        // - Never set `.extendedProperties` on Protocol Mode, Boot Output, or Output Report
         hidInfoChar = CBMutableCharacteristic(
             type: HOGPUUID.hidInformation,
             properties: [.read],
             value: nil,
-            permissions: [.readable]
+            permissions: [.readEncryptionRequired]
         )
         reportMapChar = CBMutableCharacteristic(
             type: HOGPUUID.reportMap,
             properties: [.read],
             value: nil,
-            permissions: [.readable, .readEncryptionRequired]
+            permissions: [.readEncryptionRequired]
         )
         hidControlPointChar = CBMutableCharacteristic(
             type: HOGPUUID.hidControlPoint,
             properties: [.writeWithoutResponse],
             value: nil,
-            permissions: [.writeable]
+            permissions: [.writeEncryptionRequired]
         )
         protocolModeChar = CBMutableCharacteristic(
             type: HOGPUUID.protocolMode,
             properties: [.read, .writeWithoutResponse],
             value: nil,
-            permissions: [.readable, .writeable]
+            permissions: [.readEncryptionRequired, .writeEncryptionRequired]
         )
         bootKeyboardInputChar = CBMutableCharacteristic(
             type: HOGPUUID.bootKeyboardInput,
-            properties: [.read, .notify],
+            properties: [.read, .notifyEncryptionRequired],
             value: nil,
-            permissions: [.readable, .readEncryptionRequired]
+            permissions: [.readEncryptionRequired]
         )
         bootKeyboardOutputChar = CBMutableCharacteristic(
             type: HOGPUUID.bootKeyboardOutput,
             properties: [.read, .write, .writeWithoutResponse],
             value: nil,
-            permissions: [.readable, .readEncryptionRequired, .writeable, .writeEncryptionRequired]
+            permissions: [.readEncryptionRequired, .writeEncryptionRequired]
         )
         bootMouseInputChar = CBMutableCharacteristic(
             type: HOGPUUID.bootMouseInput,
-            properties: [.read, .notify],
+            properties: [.read, .notifyEncryptionRequired],
             value: nil,
-            permissions: [.readable, .readEncryptionRequired]
+            permissions: [.readEncryptionRequired]
         )
 
         keyboardInputChar = makeReportCharacteristic(
@@ -389,6 +639,9 @@ final class BLEHIDPeripheralService: NSObject {
         )
 
         let hidService = CBMutableService(type: HOGPUUID.hidService, primary: true)
+        if let battery {
+            hidService.includedServices = [battery]
+        }
         hidService.characteristics = [
             hidInfoChar,
             reportMapChar,
@@ -403,49 +656,16 @@ final class BLEHIDPeripheralService: NSObject {
             consumerInputChar,
             systemInputChar
         ]
-
-        // 2. Battery Service (0x180F)
-        batteryLevelChar = CBMutableCharacteristic(
-            type: HOGPUUID.batteryLevel,
-            properties: [.read, .notify],
-            value: nil,
-            permissions: [.readable, .readEncryptionRequired]
-        )
-        let batteryService = CBMutableService(type: HOGPUUID.batteryService, primary: true)
-        batteryService.characteristics = [batteryLevelChar]
-
-        // 3. Device Information Service (0x180A)
-        manufacturerChar = CBMutableCharacteristic(
-            type: HOGPUUID.manufacturerName,
-            properties: [.read],
-            value: nil,
-            permissions: [.readable]
-        )
-        modelNumberChar = CBMutableCharacteristic(
-            type: HOGPUUID.modelNumber,
-            properties: [.read],
-            value: nil,
-            permissions: [.readable]
-        )
-        pnpIDChar = CBMutableCharacteristic(
-            type: HOGPUUID.pnpID,
-            properties: [.read],
-            value: nil,
-            permissions: [.readable]
-        )
-        let disService = CBMutableService(type: HOGPUUID.deviceInformationService, primary: true)
-        disService.characteristics = [manufacturerChar, modelNumberChar, pnpIDChar]
-
-        return [hidService, batteryService, disService]
+        return hidService
     }
 
     private func makeReportCharacteristic(reportID: UInt8, isOutput: Bool) -> CBMutableCharacteristic {
         let properties: CBCharacteristicProperties = isOutput
             ? [.read, .write, .writeWithoutResponse]
-            : [.read, .notify]
+            : [.read, .notifyEncryptionRequired]
         let permissions: CBAttributePermissions = isOutput
-            ? [.readable, .readEncryptionRequired, .writeable, .writeEncryptionRequired]
-            : [.readable, .readEncryptionRequired]
+            ? [.readEncryptionRequired, .writeEncryptionRequired]
+            : [.readEncryptionRequired]
 
         let characteristic = CBMutableCharacteristic(
             type: HOGPUUID.report,
@@ -465,41 +685,37 @@ final class BLEHIDPeripheralService: NSObject {
 
     private func setupServicesSequentially(on manager: CBPeripheralManager) {
         emitState(.initializing)
+        isPublishingServices = true
         servicesPublished = false
         hidServicePublished = false
+        hidRetryWithoutIncludedBattery = false
+        batteryServiceObj = nil
+        deviceInfoServiceObj = nil
+        hidServiceObj = nil
+        serviceChangedDummyObj = nil
         subscriptionsByCharacteristic.removeAll()
+        gattStatus = HOGPServiceStatus()
+        emitGATTStatus()
+
         if manager.isAdvertising {
             manager.stopAdvertising()
         }
         manager.removeAllServices()
-        pendingServicesToAdd = buildServices()
-        emitLog(.gatt, "GATT servisleri sırayla ekleniyor (1812, 180F, 180A)...")
-        addNextPendingService(on: manager)
-    }
 
-    private func addNextPendingService(on manager: CBPeripheralManager) {
-        guard !pendingServicesToAdd.isEmpty else {
-            if hidServicePublished {
-                servicesPublished = true
-                emitLog(.gatt, "HOGP GATT servisleri yayınlandı.")
-                if shouldAdvertise {
-                    beginAdvertising(on: manager)
-                } else {
-                    updateConnectionState(from: manager)
-                }
-            }
-            return
-        }
-        let next = pendingServicesToAdd.removeFirst()
-        manager.add(next)
+        let battery = buildBatteryService()
+        batteryServiceObj = battery
+        emitLog(.gatt, "GATT servisleri HOGP sırasıyla ekleniyor (180F → 180A → 1812)...")
+        manager.add(battery)
     }
 
     private func beginAdvertising(on manager: CBPeripheralManager) {
         usingFallbackAdvertising = false
         let payload: [String: Any] = [
-            CBAdvertisementDataServiceUUIDsKey: [HOGPUUID.hidServiceAdvertising16Bit],
-            CBAdvertisementDataLocalNameKey: advertisedName
+            CBAdvertisementDataLocalNameKey: advertisedName,
+            CBAdvertisementDataServiceUUIDsKey: [HOGPUUID.hidServiceAdvertising16Bit]
         ]
+        gattStatus.advertisingMode = "Başlatılıyor (16-bit 0x1812)..."
+        emitGATTStatus()
         emitLog(.ble, "BLE yayını başlatılıyor (16-bit 0x1812): \"\(advertisedName)\"...")
         manager.startAdvertising(payload)
     }
@@ -512,7 +728,7 @@ final class BLEHIDPeripheralService: NSObject {
         switch peripheral.state {
         case .poweredOn:
             emitLog(.ble, "Bluetooth radyosu açık.")
-            if !servicesPublished && pendingServicesToAdd.isEmpty {
+            if !servicesPublished && !isPublishingServices {
                 setupServicesSequentially(on: peripheral)
             } else if servicesPublished && hidServicePublished && shouldAdvertise && !peripheral.isAdvertising {
                 beginAdvertising(on: peripheral)
@@ -520,25 +736,45 @@ final class BLEHIDPeripheralService: NSObject {
                 updateConnectionState(from: peripheral)
             }
         case .poweredOff:
+            isPublishingServices = false
             servicesPublished = false
             hidServicePublished = false
-            pendingServicesToAdd.removeAll()
+            batteryServiceObj = nil
+            deviceInfoServiceObj = nil
+            hidServiceObj = nil
+            serviceChangedDummyObj = nil
             subscriptionsByCharacteristic.removeAll()
             reliableQueue.removeAll()
             pendingMouse.clear()
+            gattStatus = HOGPServiceStatus(advertisingMode: "Bluetooth Kapalı")
+            emitGATTStatus()
             emitState(.poweredOff)
             emitLog(.ble, "Bluetooth kapalı.")
         case .unauthorized:
+            isPublishingServices = false
+            gattStatus.isAdvertising = false
+            gattStatus.advertisingMode = "İzin Yok"
+            emitGATTStatus()
             emitState(.unauthorized)
             emitLog(.error, "Bluetooth izni reddedildi.")
         case .unsupported:
+            isPublishingServices = false
+            gattStatus.isAdvertising = false
+            gattStatus.advertisingMode = "Desteklenmiyor"
+            emitGATTStatus()
             emitState(.unsupported)
             emitLog(.error, "BLE Çevre Birimi modu bu ortamda desteklenmiyor (örn. Simülatör).")
         case .resetting:
+            isPublishingServices = false
             servicesPublished = false
             hidServicePublished = false
-            pendingServicesToAdd.removeAll()
+            batteryServiceObj = nil
+            deviceInfoServiceObj = nil
+            hidServiceObj = nil
+            serviceChangedDummyObj = nil
             subscriptionsByCharacteristic.removeAll()
+            gattStatus = HOGPServiceStatus(advertisingMode: "Sıfırlanıyor")
+            emitGATTStatus()
             emitState(.initializing)
             emitLog(.ble, "Bluetooth yığını sıfırlanıyor...")
         case .unknown:
@@ -721,7 +957,7 @@ final class BLEHIDPeripheralService: NSObject {
 
     private func sanitizedDeviceName(_ raw: String) -> String {
         let trimmed = raw.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmed.isEmpty ? "BluePad" : String(trimmed.prefix(22))
+        return trimmed.isEmpty ? "BluePad" : String(trimmed.prefix(18))
     }
 
     private func hexString(_ data: Data) -> String {
@@ -781,6 +1017,34 @@ final class BLEHIDPeripheralService: NSObject {
             handler?()
         }
     }
+
+    private func emitDiscoveredHosts(force: Bool) {
+        let now = ProcessInfo.processInfo.systemUptime
+        if !force && (now - lastHostEmitUptime) < 0.35 {
+            return
+        }
+        lastHostEmitUptime = now
+        let sorted = DiscoveredBLEHost.sortForDisplay(Array(discoveredHosts.values))
+        let handler = onDiscoveredHostsChange
+        Task { @MainActor in
+            handler?(sorted)
+        }
+    }
+
+    private func emitScanningState(_ scanning: Bool) {
+        let handler = onScanningStateChange
+        Task { @MainActor in
+            handler?(scanning)
+        }
+    }
+
+    private func emitGATTStatus() {
+        let snapshot = gattStatus
+        let handler = onGATTStatusChange
+        Task { @MainActor in
+            handler?(snapshot)
+        }
+    }
 }
 
 // MARK: - CBPeripheralManagerDelegate
@@ -792,29 +1056,100 @@ extension BLEHIDPeripheralService: CBPeripheralManagerDelegate {
     }
 
     func peripheralManager(_ peripheral: CBPeripheralManager, didAdd service: CBService, error: Error?) {
-        if let error {
-            let nsError = error as NSError
-            emitLog(
-                .error,
-                "GATT servisi eklenemedi (\(service.uuid.uuidString)) [\(nsError.domain):\(nsError.code)]: \(error.localizedDescription)"
-            )
-            if service.uuid == HOGPUUID.hidService {
-                pendingServicesToAdd.removeAll()
-                servicesPublished = false
-                hidServicePublished = false
-                emitState(.failed("HID 1812: \(error.localizedDescription)"))
+        if service === serviceChangedDummyObj || (serviceChangedDummyObj != nil && service.uuid == serviceChangedDummyObj?.uuid) {
+            if let error {
+                let nsError = error as NSError
+                emitLog(.error, "GATT Service Changed hatası [\(nsError.domain):\(nsError.code)]: \(error.localizedDescription)")
             } else {
-                // Optional auxiliary services (180F / 180A) must not block primary HID service advertising.
-                addNextPendingService(on: peripheral)
+                emitLog(.gatt, "GATT Service Changed sinyali gönderildi.")
             }
             return
         }
 
-        if service.uuid == HOGPUUID.hidService {
-            hidServicePublished = true
+        if let error {
+            let nsError = error as NSError
+            let errText = "\(nsError.domain):\(nsError.code) \(error.localizedDescription)"
+            emitLog(
+                .error,
+                "GATT servisi eklenemedi (\(service.uuid.uuidString)) [\(nsError.domain):\(nsError.code)]: \(error.localizedDescription)"
+            )
+
+            switch service.uuid {
+            case HOGPUUID.batteryService:
+                batteryServiceObj = nil
+                gattStatus.batteryAdded = false
+                gattStatus.lastError = "180F: \(errText)"
+                emitGATTStatus()
+                let dis = buildDeviceInfoService()
+                deviceInfoServiceObj = dis
+                peripheral.add(dis)
+
+            case HOGPUUID.deviceInformationService:
+                deviceInfoServiceObj = nil
+                gattStatus.deviceInfoAdded = false
+                emitGATTStatus()
+                let hid = buildHIDService(includingBattery: batteryServiceObj)
+                hidServiceObj = hid
+                peripheral.add(hid)
+
+            case HOGPUUID.hidService:
+                if hidServiceObj?.includedServices != nil && !hidRetryWithoutIncludedBattery {
+                    hidRetryWithoutIncludedBattery = true
+                    emitLog(.ble, "1812 includedServices reddedildi; bağımsız HID servisi deneniyor...")
+                    let fallbackHID = buildHIDService(includingBattery: nil)
+                    hidServiceObj = fallbackHID
+                    peripheral.add(fallbackHID)
+                    return
+                }
+                isPublishingServices = false
+                servicesPublished = false
+                hidServicePublished = false
+                gattStatus.hidAdded = false
+                gattStatus.lastError = "1812: \(errText)"
+                emitGATTStatus()
+                emitState(.failed("HID 1812: \(error.localizedDescription)"))
+
+            default:
+                break
+            }
+            return
         }
+
         emitLog(.gatt, "Servis eklendi: \(service.uuid.uuidString)")
-        addNextPendingService(on: peripheral)
+
+        switch service.uuid {
+        case HOGPUUID.batteryService:
+            gattStatus.batteryAdded = true
+            emitGATTStatus()
+            let dis = buildDeviceInfoService()
+            deviceInfoServiceObj = dis
+            peripheral.add(dis)
+
+        case HOGPUUID.deviceInformationService:
+            gattStatus.deviceInfoAdded = true
+            emitGATTStatus()
+            let hid = buildHIDService(includingBattery: batteryServiceObj)
+            hidServiceObj = hid
+            peripheral.add(hid)
+
+        case HOGPUUID.hidService:
+            isPublishingServices = false
+            hidServicePublished = true
+            servicesPublished = true
+            gattStatus.hidAdded = true
+            gattStatus.includedBatteryInHID = (hidServiceObj?.includedServices?.isEmpty == false)
+            gattStatus.lastError = nil
+            emitGATTStatus()
+            emitLog(.gatt, "HOGP GATT servisleri yayınlandı.")
+            if shouldAdvertise {
+                beginAdvertising(on: peripheral)
+            } else {
+                updateConnectionState(from: peripheral)
+            }
+
+        default:
+            break
+        }
     }
 
     func peripheralManagerDidStartAdvertising(_ peripheral: CBPeripheralManager, error: Error?) {
@@ -826,17 +1161,31 @@ extension BLEHIDPeripheralService: CBPeripheralManagerDelegate {
             )
             if !usingFallbackAdvertising {
                 usingFallbackAdvertising = true
-                emitLog(.ble, "16-bit 0x1812 yayını reddedildi; 128-bit taşmasız yayına geçiliyor...")
+                gattStatus.lastError = "16-bit 0x1812 [\(nsError.domain):\(nsError.code)]"
+                gattStatus.advertisingMode = "128-bit + İsim deneniyor..."
+                emitGATTStatus()
+                emitLog(.ble, "16-bit 0x1812 reddedildi [\(nsError.domain):\(nsError.code)]; 128-bit + İsim moduna geçiliyor...")
                 peripheral.startAdvertising([
+                    CBAdvertisementDataLocalNameKey: advertisedName,
                     CBAdvertisementDataServiceUUIDsKey: [HOGPUUID.hidService]
                 ])
             } else {
+                gattStatus.isAdvertising = false
+                gattStatus.advertisingMode = "Hata"
+                gattStatus.lastError = "\(nsError.domain):\(nsError.code) \(error.localizedDescription)"
+                emitGATTStatus()
                 emitState(.failed("Yayın hatası: \(error.localizedDescription)"))
             }
             return
         }
-        let modeTag = usingFallbackAdvertising ? "128-bit taşmasız" : "16-bit 0x1812"
-        emitLog(.ble, "HID yayını aktif (\(modeTag)): \"\(advertisedName)\"")
+        let modeText = usingFallbackAdvertising ? "Aktif (128-bit + İsim)" : "Aktif (16-bit 0x1812)"
+        gattStatus.isAdvertising = peripheral.isAdvertising
+        gattStatus.advertisingMode = modeText
+        if !usingFallbackAdvertising {
+            gattStatus.lastError = nil
+        }
+        emitGATTStatus()
+        emitLog(.ble, "HID yayını aktif (\(modeText)): \"\(advertisedName)\"")
         updateConnectionState(from: peripheral)
     }
 
@@ -930,7 +1279,7 @@ extension BLEHIDPeripheralService: CBPeripheralManagerDelegate {
     }
 }
 
-// MARK: - CBCentralManagerDelegate (iOS Permission Prompt Bootstrap)
+// MARK: - CBCentralManagerDelegate (Permission Bootstrap & Outbound Host Scanner)
 
 extension BLEHIDPeripheralService: CBCentralManagerDelegate {
 
@@ -942,10 +1291,18 @@ extension BLEHIDPeripheralService: CBCentralManagerDelegate {
 
         switch central.state {
         case .poweredOn:
+            refreshSystemConnectedHosts(on: central)
+            emitDiscoveredHosts(force: true)
+
             if peripheralManager == nil || peripheralManager?.state == .unknown {
+                isPublishingServices = false
                 servicesPublished = false
                 hidServicePublished = false
-                pendingServicesToAdd.removeAll()
+                hidRetryWithoutIncludedBattery = false
+                batteryServiceObj = nil
+                deviceInfoServiceObj = nil
+                hidServiceObj = nil
+                serviceChangedDummyObj = nil
                 peripheralManager?.delegate = nil
                 emitLog(.ble, "Central açıldı; CBPeripheralManager başlatılıyor...")
                 peripheralManager = CBPeripheralManager(
@@ -956,18 +1313,135 @@ extension BLEHIDPeripheralService: CBCentralManagerDelegate {
             } else if let manager = peripheralManager {
                 handleManagerState(manager)
             }
+
+            if pendingHostScan {
+                pendingHostScan = false
+                startHostScan()
+            }
+
         case .unauthorized:
+            stopHostScan()
             emitState(.unauthorized)
+
         case .poweredOff:
+            stopHostScan()
             emitState(.poweredOff)
+
         case .unsupported:
+            stopHostScan()
             if peripheralManager == nil || peripheralManager?.state == .unknown {
                 emitState(.unsupported)
             }
+
         case .resetting, .unknown:
             break
+
         @unknown default:
             break
+        }
+    }
+
+    func centralManager(
+        _ central: CBCentralManager,
+        didDiscover peripheral: CBPeripheral,
+        advertisementData: [String: Any],
+        rssi RSSI: NSNumber
+    ) {
+        let rssiValue = RSSI.intValue
+        guard rssiValue != 127 else { return }
+
+        let advName = (advertisementData[CBAdvertisementDataLocalNameKey] as? String)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let periphName = peripheral.name?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        let existing = discoveredHosts[peripheral.identifier]
+
+        let resolvedName: String
+        let hasName: Bool
+        if !advName.isEmpty {
+            resolvedName = advName
+            hasName = true
+        } else if !periphName.isEmpty {
+            resolvedName = periphName
+            hasName = true
+        } else if let existing, existing.hasExplicitName {
+            resolvedName = existing.name
+            hasName = true
+        } else {
+            let shortID = String(peripheral.identifier.uuidString.prefix(8))
+            resolvedName = "Bilinmeyen BLE (\(shortID))"
+            hasName = false
+        }
+
+        let isConnectable = (advertisementData[CBAdvertisementDataIsConnectable] as? NSNumber)?.boolValue ?? true
+        discoveredPeripherals[peripheral.identifier] = peripheral
+        discoveredHosts[peripheral.identifier] = DiscoveredBLEHost(
+            id: peripheral.identifier,
+            name: resolvedName,
+            hasExplicitName: hasName,
+            rssi: rssiValue,
+            isConnectable: isConnectable,
+            isSystemConnected: existing?.isSystemConnected ?? false,
+            linkState: existing?.linkState ?? .discovered,
+            lastSeen: Date()
+        )
+        emitDiscoveredHosts(force: false)
+    }
+
+    func centralManager(_ central: CBCentralManager, didConnect peripheral: CBPeripheral) {
+        let hostName = discoveredHosts[peripheral.identifier]?.name
+            ?? peripheral.name
+            ?? "BLE Cihazı"
+        if var host = discoveredHosts[peripheral.identifier] {
+            host.linkState = .connected
+            host.lastSeen = Date()
+            discoveredHosts[peripheral.identifier] = host
+        } else {
+            discoveredHosts[peripheral.identifier] = DiscoveredBLEHost(
+                id: peripheral.identifier,
+                name: hostName,
+                hasExplicitName: !(peripheral.name ?? "").isEmpty,
+                rssi: -50,
+                isConnectable: true,
+                isSystemConnected: true,
+                linkState: .connected,
+                lastSeen: Date()
+            )
+        }
+        emitDiscoveredHosts(force: true)
+        emitLog(.ble, "Cihaza bağlanıldı: \(hostName). Karşı cihazın HID (0x1812) servisine abone olması bekleniyor...")
+
+        let targetID = peripheral.identifier
+        DispatchQueue.main.asyncAfter(deadline: .now() + 1.2) { [weak self] in
+            guard let self else { return }
+            if self.totalConnectedCentrals() == 0,
+               self.discoveredHosts[targetID]?.linkState.isConnected == true {
+                self.triggerServiceChangedRefresh()
+            }
+        }
+    }
+
+    func centralManager(_ central: CBCentralManager, didFailToConnect peripheral: CBPeripheral, error: Error?) {
+        let reason = error?.localizedDescription ?? "Bağlantı başarısız"
+        let hostName = discoveredHosts[peripheral.identifier]?.name ?? peripheral.name ?? "BLE Cihazı"
+        if var host = discoveredHosts[peripheral.identifier] {
+            host.linkState = .failed(reason)
+            discoveredHosts[peripheral.identifier] = host
+            emitDiscoveredHosts(force: true)
+        }
+        emitLog(.error, "Hedef cihaza bağlanılamadı (\(hostName)): \(reason)")
+    }
+
+    func centralManager(_ central: CBCentralManager, didDisconnectPeripheral peripheral: CBPeripheral, error: Error?) {
+        let hostName = discoveredHosts[peripheral.identifier]?.name ?? peripheral.name ?? "BLE Cihazı"
+        if var host = discoveredHosts[peripheral.identifier] {
+            host.linkState = .discovered
+            discoveredHosts[peripheral.identifier] = host
+            emitDiscoveredHosts(force: true)
+        }
+        if let error {
+            emitLog(.ble, "Hedef cihaz bağlantısı kesildi (\(hostName)): \(error.localizedDescription)")
+        } else {
+            emitLog(.ble, "Hedef cihaz bağlantısı kesildi (\(hostName)).")
         }
     }
 }
