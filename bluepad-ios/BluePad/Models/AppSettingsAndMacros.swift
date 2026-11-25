@@ -29,6 +29,9 @@ struct BluePadSettings: Codable, Equatable, Sendable {
     var jigglerIntervalSeconds: Int
     var jigglerMode: JigglerMode
     var scannerAutoEnter: Bool
+    var touchpadButtonsOnTop: Bool
+    var showScrollStrip: Bool
+    var macroGridColumns: Int
 
     static let `default` = BluePadSettings(
         advertisedName: "BluePad",
@@ -44,17 +47,81 @@ struct BluePadSettings: Codable, Equatable, Sendable {
         airMouseSensitivity: 1.2,
         jigglerIntervalSeconds: 45,
         jigglerMode: .microMouse,
-        scannerAutoEnter: true
+        scannerAutoEnter: true,
+        touchpadButtonsOnTop: false,
+        showScrollStrip: true,
+        macroGridColumns: 2
     )
+
+    init(
+        advertisedName: String,
+        keyboardLayout: KeyboardLayoutKind,
+        hostOS: HostOSProfile,
+        pointerSensitivity: Double,
+        pointerAcceleration: Bool,
+        scrollSensitivity: Double,
+        naturalScrolling: Bool,
+        tapToClick: Bool,
+        hapticsEnabled: Bool,
+        typingDelayMs: Int,
+        airMouseSensitivity: Double,
+        jigglerIntervalSeconds: Int,
+        jigglerMode: JigglerMode,
+        scannerAutoEnter: Bool,
+        touchpadButtonsOnTop: Bool = false,
+        showScrollStrip: Bool = true,
+        macroGridColumns: Int = 2
+    ) {
+        self.advertisedName = advertisedName
+        self.keyboardLayout = keyboardLayout
+        self.hostOS = hostOS
+        self.pointerSensitivity = pointerSensitivity
+        self.pointerAcceleration = pointerAcceleration
+        self.scrollSensitivity = scrollSensitivity
+        self.naturalScrolling = naturalScrolling
+        self.tapToClick = tapToClick
+        self.hapticsEnabled = hapticsEnabled
+        self.typingDelayMs = typingDelayMs
+        self.airMouseSensitivity = airMouseSensitivity
+        self.jigglerIntervalSeconds = jigglerIntervalSeconds
+        self.jigglerMode = jigglerMode
+        self.scannerAutoEnter = scannerAutoEnter
+        self.touchpadButtonsOnTop = touchpadButtonsOnTop
+        self.showScrollStrip = showScrollStrip
+        self.macroGridColumns = macroGridColumns
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        let def = BluePadSettings.default
+        advertisedName = try c.decodeIfPresent(String.self, forKey: .advertisedName) ?? def.advertisedName
+        keyboardLayout = try c.decodeIfPresent(KeyboardLayoutKind.self, forKey: .keyboardLayout) ?? def.keyboardLayout
+        hostOS = try c.decodeIfPresent(HostOSProfile.self, forKey: .hostOS) ?? def.hostOS
+        pointerSensitivity = try c.decodeIfPresent(Double.self, forKey: .pointerSensitivity) ?? def.pointerSensitivity
+        pointerAcceleration = try c.decodeIfPresent(Bool.self, forKey: .pointerAcceleration) ?? def.pointerAcceleration
+        scrollSensitivity = try c.decodeIfPresent(Double.self, forKey: .scrollSensitivity) ?? def.scrollSensitivity
+        naturalScrolling = try c.decodeIfPresent(Bool.self, forKey: .naturalScrolling) ?? def.naturalScrolling
+        tapToClick = try c.decodeIfPresent(Bool.self, forKey: .tapToClick) ?? def.tapToClick
+        hapticsEnabled = try c.decodeIfPresent(Bool.self, forKey: .hapticsEnabled) ?? def.hapticsEnabled
+        typingDelayMs = try c.decodeIfPresent(Int.self, forKey: .typingDelayMs) ?? def.typingDelayMs
+        airMouseSensitivity = try c.decodeIfPresent(Double.self, forKey: .airMouseSensitivity) ?? def.airMouseSensitivity
+        jigglerIntervalSeconds = try c.decodeIfPresent(Int.self, forKey: .jigglerIntervalSeconds) ?? def.jigglerIntervalSeconds
+        jigglerMode = try c.decodeIfPresent(JigglerMode.self, forKey: .jigglerMode) ?? def.jigglerMode
+        scannerAutoEnter = try c.decodeIfPresent(Bool.self, forKey: .scannerAutoEnter) ?? def.scannerAutoEnter
+        touchpadButtonsOnTop = try c.decodeIfPresent(Bool.self, forKey: .touchpadButtonsOnTop) ?? def.touchpadButtonsOnTop
+        showScrollStrip = try c.decodeIfPresent(Bool.self, forKey: .showScrollStrip) ?? def.showScrollStrip
+        macroGridColumns = try c.decodeIfPresent(Int.self, forKey: .macroGridColumns) ?? def.macroGridColumns
+    }
 
     mutating func clampToValidRanges() {
         let trimmed = advertisedName.trimmingCharacters(in: .whitespacesAndNewlines)
-        advertisedName = trimmed.isEmpty ? "BluePad" : String(trimmed.prefix(22))
+        advertisedName = trimmed.isEmpty ? "BluePad" : String(trimmed.prefix(18))
         pointerSensitivity = min(3.5, max(0.3, pointerSensitivity))
         scrollSensitivity = min(3.0, max(0.3, scrollSensitivity))
         typingDelayMs = min(80, max(5, typingDelayMs))
         airMouseSensitivity = min(3.0, max(0.4, airMouseSensitivity))
         jigglerIntervalSeconds = min(300, max(10, jigglerIntervalSeconds))
+        macroGridColumns = min(3, max(2, macroGridColumns))
     }
 }
 
@@ -76,11 +143,35 @@ enum MacroCategory: String, CaseIterable, Identifiable, Codable, Sendable {
     }
 }
 
+enum MacroStep: Codable, Equatable, Hashable, Sendable {
+    case keyCombo(keyCode: UInt8, modifiersRaw: UInt8)
+    case typeText(text: String, appendEnter: Bool)
+    case consumerKey(usageRaw: UInt16)
+    case delayMs(Int)
+
+    var summaryLabel: String {
+        switch self {
+        case .keyCombo(let keyCode, let modifiersRaw):
+            let mods = HIDModifier(rawValue: modifiersRaw).displayTokens
+            let keyName = HIDKeyCode(rawValue: keyCode)?.displayName ?? String(format: "0x%02X", keyCode)
+            return (mods + [keyName]).joined(separator: " + ")
+        case .typeText(let text, let appendEnter):
+            let preview = text.count > 16 ? String(text.prefix(16)) + "…" : text
+            return appendEnter ? "\"\(preview)\" + ⏎" : "\"\(preview)\""
+        case .consumerKey(let usageRaw):
+            return HIDConsumerUsage(rawValue: usageRaw)?.displayName ?? String(format: "Medya 0x%04X", usageRaw)
+        case .delayMs(let ms):
+            return "Bekle \(ms)ms"
+        }
+    }
+}
+
 enum MacroAction: Codable, Equatable, Hashable, Sendable {
     case keyCombo(keyCode: UInt8, modifiersRaw: UInt8)
     case typeText(text: String, appendEnter: Bool)
     case consumerKey(usageRaw: UInt16)
     case systemKey(usageRaw: UInt8)
+    case sequence(steps: [MacroStep])
 
     var summaryLabel: String {
         switch self {
@@ -99,6 +190,8 @@ enum MacroAction: Codable, Equatable, Hashable, Sendable {
             if sys.contains(.powerDown) { return "Sistem Güç" }
             if sys.contains(.wakeUp) { return "Sistemi Uyandır" }
             return "Sistem Tuşu"
+        case .sequence(let steps):
+            return "\(steps.count) adımlı dizi"
         }
     }
 }
@@ -110,6 +203,7 @@ struct CustomMacro: Identifiable, Codable, Equatable, Sendable {
     var sfSymbol: String
     var accentHex: String
     var category: MacroCategory
+    var fullWidth: Bool
     var action: MacroAction
 
     init(
@@ -119,6 +213,7 @@ struct CustomMacro: Identifiable, Codable, Equatable, Sendable {
         sfSymbol: String,
         accentHex: String,
         category: MacroCategory,
+        fullWidth: Bool = false,
         action: MacroAction
     ) {
         self.id = id
@@ -127,7 +222,20 @@ struct CustomMacro: Identifiable, Codable, Equatable, Sendable {
         self.sfSymbol = sfSymbol
         self.accentHex = accentHex
         self.category = category
+        self.fullWidth = fullWidth
         self.action = action
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(UUID.self, forKey: .id)
+        title = try c.decode(String.self, forKey: .title)
+        subtitle = try c.decode(String.self, forKey: .subtitle)
+        sfSymbol = try c.decode(String.self, forKey: .sfSymbol)
+        accentHex = try c.decode(String.self, forKey: .accentHex)
+        category = try c.decode(MacroCategory.self, forKey: .category)
+        fullWidth = try c.decodeIfPresent(Bool.self, forKey: .fullWidth) ?? false
+        action = try c.decode(MacroAction.self, forKey: .action)
     }
 
     static let defaultPresets: [CustomMacro] = [

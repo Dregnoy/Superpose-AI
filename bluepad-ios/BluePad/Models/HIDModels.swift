@@ -482,8 +482,38 @@ struct DiscoveredBLEHost: Identifiable, Equatable, Sendable {
     var rssi: Int
     var isConnectable: Bool
     var isSystemConnected: Bool
+    var manufacturerName: String?
     var linkState: BLEHostLinkState
     var lastSeen: Date
+
+    init(
+        id: UUID,
+        name: String,
+        hasExplicitName: Bool,
+        rssi: Int,
+        isConnectable: Bool,
+        isSystemConnected: Bool,
+        manufacturerName: String? = nil,
+        linkState: BLEHostLinkState,
+        lastSeen: Date
+    ) {
+        self.id = id
+        self.name = name
+        self.hasExplicitName = hasExplicitName
+        self.rssi = rssi
+        self.isConnectable = isConnectable
+        self.isSystemConnected = isSystemConnected
+        self.manufacturerName = manufacturerName
+        self.linkState = linkState
+        self.lastSeen = lastSeen
+    }
+
+    var proximityLabel: String {
+        if rssi >= -55 { return "Çok Yakın" }
+        if rssi >= -72 { return "Yakın" }
+        if rssi >= -85 { return "Orta" }
+        return "Uzak"
+    }
 
     static func sortForDisplay(_ hosts: [DiscoveredBLEHost]) -> [DiscoveredBLEHost] {
         hosts.sorted { lhs, rhs in
@@ -517,4 +547,128 @@ struct HOGPServiceStatus: Equatable, Sendable {
     var isAdvertising: Bool = false
     var advertisingMode: String = "Bekliyor"
     var lastError: String? = nil
+}
+
+/// USB HID Gamepad button bitmask (Report ID 5, 16-bit LE).
+struct HIDGamepadButton: OptionSet, Sendable, Hashable, Codable {
+    let rawValue: UInt16
+
+    init(rawValue: UInt16) {
+        self.rawValue = rawValue
+    }
+
+    static let a      = HIDGamepadButton(rawValue: 1 << 0)
+    static let b      = HIDGamepadButton(rawValue: 1 << 1)
+    static let x      = HIDGamepadButton(rawValue: 1 << 2)
+    static let y      = HIDGamepadButton(rawValue: 1 << 3)
+    static let l1     = HIDGamepadButton(rawValue: 1 << 4)
+    static let r1     = HIDGamepadButton(rawValue: 1 << 5)
+    static let l2     = HIDGamepadButton(rawValue: 1 << 6)
+    static let r2     = HIDGamepadButton(rawValue: 1 << 7)
+    static let select = HIDGamepadButton(rawValue: 1 << 8)
+    static let start  = HIDGamepadButton(rawValue: 1 << 9)
+    static let l3     = HIDGamepadButton(rawValue: 1 << 10)
+    static let r3     = HIDGamepadButton(rawValue: 1 << 11)
+    static let home   = HIDGamepadButton(rawValue: 1 << 12)
+}
+
+/// 8-way D-Pad Hat Switch direction + centered null state (0x08).
+enum HIDGamepadHat: UInt8, Sendable, Hashable, Codable {
+    case up        = 0
+    case upRight   = 1
+    case right     = 2
+    case downRight = 3
+    case down      = 4
+    case downLeft  = 5
+    case left      = 6
+    case upLeft    = 7
+    case center    = 8
+}
+
+/// Complete live Gamepad input state (Report ID 5, 7 bytes).
+struct HIDGamepadState: Equatable, Sendable {
+    var buttons: HIDGamepadButton = []
+    var hat: HIDGamepadHat = .center
+    var leftX: Int8 = 0
+    var leftY: Int8 = 0
+    var rightX: Int8 = 0
+    var rightY: Int8 = 0
+}
+
+/// Bluetooth SIG assigned Company Identifier decoder for BLE Manufacturer Specific Data.
+enum BLECompanyDirectory {
+    static func companyName(from manufacturerData: Data) -> String? {
+        guard manufacturerData.count >= 2 else { return nil }
+        let start = manufacturerData.startIndex
+        let companyID = UInt16(manufacturerData[start]) | (UInt16(manufacturerData[start + 1]) << 8)
+        switch companyID {
+        case 0x004C: return "Apple"
+        case 0x0006: return "Microsoft / Windows"
+        case 0x0075: return "Samsung"
+        case 0x00E0: return "Google / Android"
+        case 0x00C4: return "LG"
+        case 0x012D: return "Sony"
+        case 0x038F: return "Xiaomi"
+        case 0x027D: return "Huawei"
+        case 0x0002: return "Intel"
+        case 0x005D: return "Realtek"
+        case 0x000A: return "Qualcomm"
+        case 0x000F: return "Broadcom"
+        case 0x0059: return "Nordic"
+        case 0x00DA: return "Logitech"
+        case 0x0553: return "Nintendo"
+        case 0x009E: return "Bose"
+        case 0x0057: return "Harman / JBL"
+        case 0x0046: return "MediaTek"
+        case 0x0171: return "Amazon"
+        case 0x0087: return "Garmin"
+        case 0x0157: return "Amazfit"
+        default: return nil
+        }
+    }
+}
+
+/// Zero-cloud LAN Wi-Fi receiver discovered via local UDP beacon.
+struct WiFiHostEndpoint: Identifiable, Equatable, Hashable, Sendable {
+    let id: String
+    var name: String
+    var host: String
+    var port: UInt16
+    var osName: String
+    var lastSeen: Date
+
+    init(name: String, host: String, port: UInt16, osName: String = "Windows", lastSeen: Date = Date()) {
+        self.id = "\(host):\(port)"
+        self.name = name
+        self.host = host
+        self.port = port
+        self.osName = osName
+        self.lastSeen = lastSeen
+    }
+}
+
+/// Connection status of the local Wi-Fi LAN TCP link.
+enum WiFiConnectionState: Equatable, Sendable {
+    case disconnected
+    case connecting(String)
+    case connected(hostName: String, address: String)
+    case failed(String)
+
+    var isConnected: Bool {
+        if case .connected = self { return true }
+        return false
+    }
+
+    var statusText: String {
+        switch self {
+        case .disconnected:
+            return "Bağlı Değil"
+        case .connecting(let target):
+            return "Bağlanıyor: \(target)"
+        case .connected(let hostName, _):
+            return "Wi-Fi Bağlı · \(hostName)"
+        case .failed(let reason):
+            return "Wi-Fi Hatası: \(reason)"
+        }
+    }
 }
