@@ -27,6 +27,9 @@
 		BPB001000000000000000012 /* Theme.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000012 /* Theme.swift */; };
 		BPB001000000000000000013 /* ToolsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000013 /* ToolsView.swift */; };
 		BPB001000000000000000014 /* TrackpadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000014 /* TrackpadView.swift */; };
+		BPB001000000000000000016 /* WiFiHIDTransportService.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000016 /* WiFiHIDTransportService.swift */; };
+		BPB001000000000000000017 /* GamepadView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000017 /* GamepadView.swift */; };
+		BPB001000000000000000018 /* FullPCKeyboardView.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF001000000000000000018 /* FullPCKeyboardView.swift */; };
 		BPB002000000000000000015 /* BluePadCoreTests.swift in Sources */ = {isa = PBXBuildFile; fileRef = BPF002000000000000000015 /* BluePadCoreTests.swift */; };
 		BPA002000000000000000001 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = BPA001000000000000000001 /* Assets.xcassets */; };
 /* End PBXBuildFile section */
@@ -62,6 +65,9 @@
 		BPF001000000000000000012 /* Theme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "Theme.swift"; path = "BluePad/Views/Theme.swift"; sourceTree = SOURCE_ROOT; };
 		BPF001000000000000000013 /* ToolsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "ToolsView.swift"; path = "BluePad/Views/ToolsView.swift"; sourceTree = SOURCE_ROOT; };
 		BPF001000000000000000014 /* TrackpadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "TrackpadView.swift"; path = "BluePad/Views/TrackpadView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000016 /* WiFiHIDTransportService.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "WiFiHIDTransportService.swift"; path = "BluePad/Services/WiFiHIDTransportService.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000017 /* GamepadView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "GamepadView.swift"; path = "BluePad/Views/GamepadView.swift"; sourceTree = SOURCE_ROOT; };
+		BPF001000000000000000018 /* FullPCKeyboardView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "FullPCKeyboardView.swift"; path = "BluePad/Views/FullPCKeyboardView.swift"; sourceTree = SOURCE_ROOT; };
 		BPF002000000000000000015 /* BluePadCoreTests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = "BluePadCoreTests.swift"; path = "BluePadTests/BluePadCoreTests.swift"; sourceTree = SOURCE_ROOT; };
 		BPA001000000000000000001 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; name = "Assets.xcassets"; path = "BluePad/Resources/Assets.xcassets"; sourceTree = SOURCE_ROOT; };
 		BPA003000000000000000001 /* Info.plist */ = {isa = PBXFileReference; lastKnownFileType = text.plist.xml; name = "Info.plist"; path = "BluePad/Resources/Info.plist"; sourceTree = SOURCE_ROOT; };
@@ -137,6 +143,7 @@
 				BPF00100000000000000000A /* MacroStorageService.swift */,
 				BPF00100000000000000000B /* MouseMotionProcessor.swift */,
 				BPF00100000000000000000C /* SpeechDictationService.swift */,
+				BPF001000000000000000016 /* WiFiHIDTransportService.swift */,
 			);
 			name = Services;
 			sourceTree = "<group>";
@@ -146,6 +153,8 @@
 			children = (
 				BPF00100000000000000000D /* BarcodeScannerSheet.swift */,
 				BPF00100000000000000000E /* ConnectionSettingsView.swift */,
+				BPF001000000000000000018 /* FullPCKeyboardView.swift */,
+				BPF001000000000000000017 /* GamepadView.swift */,
 				BPF00100000000000000000F /* KeyboardView.swift */,
 				BPF001000000000000000010 /* RemotePresenterView.swift */,
 				BPF001000000000000000011 /* StatusHeaderBar.swift */,
@@ -285,6 +294,9 @@
 				BPB001000000000000000012 /* Theme.swift in Sources */,
 				BPB001000000000000000013 /* ToolsView.swift in Sources */,
 				BPB001000000000000000014 /* TrackpadView.swift in Sources */,
+				BPB001000000000000000016 /* WiFiHIDTransportService.swift in Sources */,
+				BPB001000000000000000017 /* GamepadView.swift in Sources */,
+				BPB001000000000000000018 /* FullPCKeyboardView.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
