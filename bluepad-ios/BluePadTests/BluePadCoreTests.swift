@@ -75,6 +75,7 @@ final class BluePadCoreTests: XCTestCase {
         XCTAssertEqual(inputBitsByReportID[2], 40, "Mouse Input report must be 5 bytes (40 bits)")
         XCTAssertEqual(inputBitsByReportID[3], 16, "Consumer Input report must be 2 bytes (16 bits)")
         XCTAssertEqual(inputBitsByReportID[4], 8, "System Input report must be 1 byte (8 bits)")
+        XCTAssertEqual(inputBitsByReportID[5], 56, "Gamepad Input report must be 7 bytes (56 bits)")
     }
 
     // MARK: - 2. Canonical 128-bit UUID Enforcement
@@ -397,5 +398,92 @@ final class BluePadCoreTests: XCTestCase {
             "Z-PC",
             "Bilinmeyen BLE"
         ])
+    }
+
+    // MARK: - 9. Gamepad Report, Manufacturer Directory, Wi-Fi QR & Settings Backwards Compatibility
+
+    func testGamepadPacketBuilderAndCompanyDirectoryAndWiFiQR() throws {
+        let gp = HIDGamepadState(
+            buttons: [.a, .r1, .start],
+            hat: .upRight,
+            leftX: -120,
+            leftY: 64,
+            rightX: 127,
+            rightY: -127
+        )
+        let bytes = [UInt8](HIDReportBuilder.gamepadReport(gp))
+        XCTAssertEqual(bytes.count, 7)
+        // buttons raw = (1<<0) | (1<<5) | (1<<9) = 0x0221 -> low=0x21, high=0x02
+        XCTAssertEqual(bytes[0], 0x21)
+        XCTAssertEqual(bytes[1], 0x02)
+        XCTAssertEqual(bytes[2], HIDGamepadHat.upRight.rawValue)
+        XCTAssertEqual(Int8(bitPattern: bytes[3]), -120)
+        XCTAssertEqual(Int8(bitPattern: bytes[4]), 64)
+        XCTAssertEqual(Int8(bitPattern: bytes[5]), 127)
+        XCTAssertEqual(Int8(bitPattern: bytes[6]), -127)
+
+        XCTAssertEqual(BLECompanyDirectory.companyName(from: Data([0x4C, 0x00, 0x10])), "Apple")
+        XCTAssertEqual(BLECompanyDirectory.companyName(from: Data([0x06, 0x00, 0x01])), "Microsoft / Windows")
+        XCTAssertEqual(BLECompanyDirectory.companyName(from: Data([0x75, 0x00])), "Samsung")
+        XCTAssertEqual(BLECompanyDirectory.companyName(from: Data([0xC4, 0x00])), "LG")
+        XCTAssertEqual(BLECompanyDirectory.companyName(from: Data([0x2D, 0x01])), "Sony")
+        XCTAssertNil(BLECompanyDirectory.companyName(from: Data([0xFF])))
+        XCTAssertNil(BLECompanyDirectory.companyName(from: Data([0xFE, 0xFE])))
+
+        let qr = WiFiHIDTransportService.parsePairingQR("bluepad://192.168.1.42:8765/1234")
+        XCTAssertNotNil(qr)
+        XCTAssertEqual(qr?.host, "192.168.1.42")
+        XCTAssertEqual(qr?.port, 8765)
+        XCTAssertEqual(qr?.pin, "1234")
+
+        let defaultPortQR = WiFiHIDTransportService.parsePairingQR("bluepad://10.0.0.5/9999")
+        XCTAssertEqual(defaultPortQR?.port, WiFiHIDTransportService.defaultTCPPort)
+        XCTAssertEqual(defaultPortQR?.pin, "9999")
+
+        XCTAssertNil(WiFiHIDTransportService.parsePairingQR("https://example.com/1234"))
+        XCTAssertNil(WiFiHIDTransportService.parsePairingQR("bluepad://192.168.1.42:8765"))
+
+        // Verify legacy settings JSON without new keys decodes cleanly
+        let legacyJSON = """
+        {
+          "advertisedName": "OldPad",
+          "keyboardLayout": "turkishQ",
+          "hostOS": "windows",
+          "pointerSensitivity": 1.5,
+          "pointerAcceleration": true,
+          "scrollSensitivity": 1.0,
+          "naturalScrolling": true,
+          "tapToClick": true,
+          "hapticsEnabled": true,
+          "typingDelayMs": 20,
+          "airMouseSensitivity": 1.2,
+          "jigglerIntervalSeconds": 45,
+          "jigglerMode": "microMouse",
+          "scannerAutoEnter": true
+        }
+        """
+        let decodedLegacy = try JSONDecoder().decode(BluePadSettings.self, from: Data(legacyJSON.utf8))
+        XCTAssertEqual(decodedLegacy.advertisedName, "OldPad")
+        XCTAssertFalse(decodedLegacy.touchpadButtonsOnTop)
+        XCTAssertTrue(decodedLegacy.showScrollStrip)
+        XCTAssertEqual(decodedLegacy.macroGridColumns, 2)
+
+        // Verify sequence macro Codable round-trip
+        let seqMacro = CustomMacro(
+            title: "Build",
+            subtitle: "3 adım",
+            sfSymbol: "hammer.fill",
+            accentHex: "#38BDF8",
+            category: .coding,
+            fullWidth: true,
+            action: .sequence(steps: [
+                .keyCombo(keyCode: HIDKeyCode.c.rawValue, modifiersRaw: HIDModifier.leftControl.rawValue),
+                .delayMs(150),
+                .typeText(text: "run", appendEnter: true)
+            ])
+        )
+        let encoded = try JSONEncoder().encode(seqMacro)
+        let decodedMacro = try JSONDecoder().decode(CustomMacro.self, from: encoded)
+        XCTAssertEqual(decodedMacro, seqMacro)
     }
 }
