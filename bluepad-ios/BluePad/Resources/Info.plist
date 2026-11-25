@@ -35,6 +35,7 @@
 	<key>UIBackgroundModes</key>
 	<array>
 		<string>bluetooth-peripheral</string>
+		<string>bluetooth-central</string>
 	</array>
 	<key>UILaunchScreen</key>
 	<dict>
