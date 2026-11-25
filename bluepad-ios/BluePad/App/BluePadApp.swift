@@ -14,6 +14,7 @@ struct BluePadApp: App {
 
 struct RootContentView: View {
     @ObservedObject var viewModel: AppViewModel
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some View {
         ZStack(alignment: .bottom) {
@@ -75,6 +76,11 @@ struct RootContentView: View {
         }
         .onAppear {
             viewModel.startBluetoothIfNeeded()
+        }
+        .onChange(of: scenePhase) { _, newPhase in
+            if newPhase == .active {
+                viewModel.handleAppDidBecomeActive()
+            }
         }
     }
 }

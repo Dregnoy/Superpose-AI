@@ -59,6 +59,9 @@ final class AppViewModel: ObservableObject {
     @Published var isScannerPresented: Bool = false
 
     @Published private(set) var packetsSentCount: Int = 0
+    @Published private(set) var discoveredHosts: [DiscoveredBLEHost] = []
+    @Published private(set) var isScanningHosts: Bool = false
+    @Published private(set) var gattStatus: HOGPServiceStatus = HOGPServiceStatus()
     @Published private(set) var diagnosticEvents: [HIDDiagnosticEvent] = []
     @Published var toastMessage: String?
 
@@ -101,6 +104,15 @@ final class AppViewModel: ObservableObject {
         bleService.onDiagnosticEvent = { [weak self] event in
             self?.appendDiagnostic(event)
         }
+        bleService.onDiscoveredHostsChange = { [weak self] hosts in
+            self?.discoveredHosts = hosts
+        }
+        bleService.onScanningStateChange = { [weak self] scanning in
+            self?.isScanningHosts = scanning
+        }
+        bleService.onGATTStatusChange = { [weak self] status in
+            self?.gattStatus = status
+        }
     }
 
     // MARK: Bluetooth Lifecycle
@@ -141,6 +153,39 @@ final class AppViewModel: ObservableObject {
         bleService.releaseAllKeys()
         triggerHaptic(.rigid)
         showToast("Tüm tuşlar serbest bırakıldı")
+    }
+
+    func toggleHostScan() {
+        triggerHaptic(.light)
+        if isScanningHosts {
+            bleService.stopHostScan()
+            showToast("Cihaz taraması durduruldu")
+        } else {
+            bleService.startHostScan()
+            showToast("Yakındaki cihazlar taranıyor...")
+        }
+    }
+
+    func connectToHost(_ host: DiscoveredBLEHost) {
+        triggerHaptic(.medium)
+        bleService.connectToHost(id: host.id)
+        showToast("Bağlanılıyor: \(host.name)")
+    }
+
+    func disconnectFromHost(_ host: DiscoveredBLEHost) {
+        triggerHaptic(.light)
+        bleService.disconnectFromHost(id: host.id)
+        showToast("Bağlantı kesildi: \(host.name)")
+    }
+
+    func triggerServiceChangedRefresh() {
+        triggerHaptic(.light)
+        bleService.triggerServiceChangedRefresh()
+        showToast("GATT Service Changed gönderildi")
+    }
+
+    func handleAppDidBecomeActive() {
+        bleService.ensureAdvertisingOnForeground()
     }
 
     // MARK: Trackpad & Mouse
