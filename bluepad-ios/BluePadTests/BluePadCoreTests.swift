@@ -308,4 +308,94 @@ final class BluePadCoreTests: XCTestCase {
         let loadedMacros = storage.loadMacros()
         XCTAssertEqual(loadedMacros, sampleMacros)
     }
+
+    // MARK: - 8. Advertising UUID, HOGP Status & Outbound Host Sorting
+
+    func testAdvertisingUUIDAndDiscoveredHostSorting() {
+        XCTAssertEqual(HOGPUUID.hidServiceAdvertising16Bit.data.count, 2)
+        XCTAssertEqual(HOGPUUID.hidServiceAdvertising16Bit.uuidString.uppercased(), "1812")
+
+        let defaultStatus = HOGPServiceStatus()
+        XCTAssertFalse(defaultStatus.batteryAdded)
+        XCTAssertFalse(defaultStatus.deviceInfoAdded)
+        XCTAssertFalse(defaultStatus.hidAdded)
+        XCTAssertFalse(defaultStatus.includedBatteryInHID)
+        XCTAssertFalse(defaultStatus.isAdvertising)
+        XCTAssertEqual(defaultStatus.advertisingMode, "Bekliyor")
+        XCTAssertNil(defaultStatus.lastError)
+
+        let now = Date()
+        let unnamedStrong = DiscoveredBLEHost(
+            id: UUID(),
+            name: "Bilinmeyen BLE",
+            hasExplicitName: false,
+            rssi: -35,
+            isConnectable: true,
+            isSystemConnected: false,
+            linkState: .discovered,
+            lastSeen: now
+        )
+        let namedWeak = DiscoveredBLEHost(
+            id: UUID(),
+            name: "Z-PC",
+            hasExplicitName: true,
+            rssi: -75,
+            isConnectable: true,
+            isSystemConnected: false,
+            linkState: .discovered,
+            lastSeen: now
+        )
+        let namedStrong = DiscoveredBLEHost(
+            id: UUID(),
+            name: "A-MacBook",
+            hasExplicitName: true,
+            rssi: -45,
+            isConnectable: true,
+            isSystemConnected: false,
+            linkState: .discovered,
+            lastSeen: now
+        )
+        let systemHost = DiscoveredBLEHost(
+            id: UUID(),
+            name: "Sistem Cihazı",
+            hasExplicitName: true,
+            rssi: -80,
+            isConnectable: true,
+            isSystemConnected: true,
+            linkState: .discovered,
+            lastSeen: now
+        )
+        let connectingHost = DiscoveredBLEHost(
+            id: UUID(),
+            name: "Bağlanan TV",
+            hasExplicitName: true,
+            rssi: -85,
+            isConnectable: true,
+            isSystemConnected: false,
+            linkState: .connecting,
+            lastSeen: now
+        )
+        let connectedHost = DiscoveredBLEHost(
+            id: UUID(),
+            name: "Bağlı Windows",
+            hasExplicitName: true,
+            rssi: -90,
+            isConnectable: true,
+            isSystemConnected: false,
+            linkState: .connected,
+            lastSeen: now
+        )
+
+        let sorted = DiscoveredBLEHost.sortForDisplay([
+            unnamedStrong, namedWeak, namedStrong, systemHost, connectingHost, connectedHost
+        ])
+        XCTAssertEqual(sorted.map(\.name), [
+            "Bağlı Windows",
+            "Bağlanan TV",
+            "Sistem Cihazı",
+            "A-MacBook",
+            "Z-PC",
+            "Bilinmeyen BLE"
+        ])
+    }
 }
