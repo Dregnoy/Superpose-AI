@@ -26,6 +26,8 @@
 	<string>BluePad, iPhone veya iPad'inizi bilgisayar, tablet veya akıllı TV için kablosuz Bluetooth klavye, trackpad ve kumanda olarak yayınlamak için Bluetooth erişimi kullanır.</string>
 	<key>NSBluetoothPeripheralUsageDescription</key>
 	<string>BluePad, yakınınızdaki cihazların sizi standart bir Bluetooth HID klavye ve fare olarak görebilmesi için Bluetooth çevre birimi modunu kullanır.</string>
+	<key>NSLocalNetworkUsageDescription</key>
+	<string>BluePad, Bluetooth HID desteklemeyen bilgisayarlara aynı Wi-Fi ağı üzerinden gecikmesiz yerel klavye, fare ve oyun kolu bağlantısı kurmak için yerel ağ erişimi kullanır.</string>
 	<key>NSCameraUsageDescription</key>
 	<string>BluePad, QR kodları ve barkodları tarayıp bağlı cihaza anında metin olarak yazmak için kamerayı kullanır.</string>
 	<key>NSMicrophoneUsageDescription</key>
