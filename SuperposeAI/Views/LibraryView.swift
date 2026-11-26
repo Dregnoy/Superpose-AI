@@ -103,6 +103,15 @@ struct LibraryView: View {
                                 }
                             }
 
+                            if selectedIDs.count == 2 {
+                                Spacer()
+                                Button {
+                                    createDoubleExposure(from: selectedIDs)
+                                } label: {
+                                    Label("Çift Poz", systemImage: "circle.lefthalf.filled")
+                                }
+                            }
+
                             Spacer()
 
                             Button(role: .destructive) {
@@ -245,6 +254,36 @@ struct LibraryView: View {
             isMultiSelectMode = false
             poseExtractAlert = "Kolaj oluşturuldu ve kütüphaneye eklendi."
         }
+    }
+
+    @MainActor
+    private func createDoubleExposure(from ids: Set<UUID>) {
+        let images = libraryStore.items
+            .filter { ids.contains($0.id) }
+            .compactMap { libraryStore.image(for: $0) }
+        guard images.count == 2,
+              let cg1 = images[0].cgImage,
+              let cg2 = images[1].cgImage else { return }
+
+        let baseCI = CIImage(cgImage: cg1)
+        let topRaw = CIImage(cgImage: cg2)
+        let scaleX = baseCI.extent.width / max(1, topRaw.extent.width)
+        let scaleY = baseCI.extent.height / max(1, topRaw.extent.height)
+        let topScaled = topRaw.transformed(by: CGAffineTransform(scaleX: scaleX, y: scaleY))
+
+        let blend = CIFilter(name: "CIScreenBlendMode")
+        blend?.setValue(topScaled, forKey: kCIInputImageKey)
+        blend?.setValue(baseCI, forKey: kCIInputBackgroundImageKey)
+
+        let context = CIContext()
+        guard let output = blend?.outputImage,
+              let resultCG = context.createCGImage(output, from: baseCI.extent) else { return }
+
+        let blended = UIImage(cgImage: resultCG, scale: images[0].scale, orientation: images[0].imageOrientation)
+        libraryStore.saveCapturedPhoto(blended)
+        selectedIDs.removeAll()
+        isMultiSelectMode = false
+        poseExtractAlert = "Çift pozlama fotoğrafı oluşturuldu."
     }
 }
 

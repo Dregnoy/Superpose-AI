@@ -84,6 +84,7 @@ struct ShotPacksView: View {
                     Toggle("Poz Uyum Titreşimi", isOn: Bindable(appState).isHapticsEnabled)
                     Toggle("Hızlı Sesli Koç", isOn: Bindable(appState).voiceCoachFast)
                     Toggle("Gülümseyince Otomatik Çek", isOn: Bindable(appState).isSmileShutterEnabled)
+                    Toggle("Sessiz Sokak Modu", isOn: Bindable(appState).isSilentModeEnabled)
 
                     Button {
                         showLegalSheet = true

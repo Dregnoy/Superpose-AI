@@ -17,6 +17,7 @@ struct CameraView: View {
     @State private var volumeShutter = VolumeShutterService()
     @State private var horizonService = HorizonLevelService()
     @State private var didVibrateForCurrentMatch = false
+    @State private var didShowHazeHint = false
     @State private var isGeneratingPoses = false
     @State private var toastMessage: String?
     @State private var autoShutterCountdown: Int?
@@ -313,12 +314,24 @@ struct CameraView: View {
         .onChange(of: visionService.guidance) { _, newGuidance in
             voiceCoach.announceIfNeeded(
                 newGuidance,
-                isEnabled: appState.isVoiceCoachEnabled,
+                isEnabled: appState.isVoiceCoachEnabled && !appState.isSilentModeEnabled,
                 hasPinnedPose: appState.pinnedPose != nil,
                 fast: appState.voiceCoachFast
             )
+            if newGuidance.lighting == .lowContrast && !didShowHazeHint {
+                didShowHazeHint = true
+                showToast("Görüntü puslu görünüyor — lensi kontrol edin")
+            }
             evaluateAutoShutter(with: newGuidance)
             evaluateMatchHaptic(with: newGuidance)
+        }
+        .onChange(of: appState.isSilentModeEnabled) { _, silent in
+            if silent {
+                voiceCoach.stop()
+                if cameraService.flashMode == .on {
+                    cameraService.toggleFlash()
+                }
+            }
         }
         .onDisappear {
             autoShutterTask?.cancel()
@@ -1327,8 +1340,8 @@ struct CameraView: View {
             for remaining in stride(from: seconds, through: 1, by: -1) {
                 guard !Task.isCancelled else { return }
                 autoShutterCountdown = remaining
-                if remaining <= 3 {
-                    voiceCoach.speak("\(remaining)")
+                if remaining <= 3 && !appState.isSilentModeEnabled {
+                    voiceCoach.speak("\(remaining)", fast: appState.voiceCoachFast)
                 }
                 try? await Task.sleep(for: .seconds(1))
             }

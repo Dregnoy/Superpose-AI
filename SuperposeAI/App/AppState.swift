@@ -64,6 +64,11 @@ final class AppState {
             UserDefaults.standard.set(isSmileShutterEnabled, forKey: "isSmileShutterEnabled")
         }
     }
+    var isSilentModeEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isSilentModeEnabled, forKey: "isSilentModeEnabled")
+        }
+    }
     var pendingCameraTip: String? = nil
     var requestedZoomFactor: Double? = nil
     var latestGeneratedPoses: [PoseIdea] = []
@@ -104,6 +109,7 @@ final class AppState {
         }
         self.voiceCoachFast = UserDefaults.standard.bool(forKey: "voiceCoachFast")
         self.isSmileShutterEnabled = UserDefaults.standard.bool(forKey: "isSmileShutterEnabled")
+        self.isSilentModeEnabled = UserDefaults.standard.bool(forKey: "isSilentModeEnabled")
         self.geminiAPIKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
         if let data = UserDefaults.standard.data(forKey: "savedCustomPoses"),
            let decoded = try? JSONDecoder().decode([PoseIdea].self, from: data) {
