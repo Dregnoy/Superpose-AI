@@ -21,7 +21,7 @@ final class CameraService: NSObject {
         }
     }
 
-    let session = AVCaptureSession()
+    nonisolated let session = AVCaptureSession()
     var cameraPosition: AVCaptureDevice.Position = .back
     var flashMode: AVCaptureDevice.FlashMode = .off
     var zoomFactor: CGFloat = 1.0
@@ -29,11 +29,14 @@ final class CameraService: NSObject {
     var lastError: CameraError?
     var isSessionRunning = false
 
-    private let sessionQueue = DispatchQueue(label: "com.superposelabs.camera.session")
-    private let videoOutput = AVCaptureVideoDataOutput()
-    private let photoOutput = AVCapturePhotoOutput()
-    private var currentInput: AVCaptureDeviceInput?
-    private var photoContinuation: CheckedContinuation<UIImage, Error>?
+    @ObservationIgnored nonisolated private let sessionQueue = DispatchQueue(label: "com.superposelabs.camera.session")
+    @ObservationIgnored nonisolated private let videoQueue = DispatchQueue(label: "com.superposelabs.camera.video")
+    @ObservationIgnored nonisolated private let videoOutput = AVCaptureVideoDataOutput()
+    @ObservationIgnored nonisolated private let photoOutput = AVCapturePhotoOutput()
+    @ObservationIgnored nonisolated(unsafe) private var currentInput: AVCaptureDeviceInput?
+    @ObservationIgnored nonisolated(unsafe) private var currentPosition: AVCaptureDevice.Position = .back
+    @ObservationIgnored nonisolated(unsafe) private var currentFlashMode: AVCaptureDevice.FlashMode = .off
+    @ObservationIgnored private var photoContinuation: CheckedContinuation<UIImage, Error>?
 
     var onVideoFrame: ((CVPixelBuffer) -> Void)?
 
@@ -55,19 +58,21 @@ final class CameraService: NSObject {
     }
 
     func startSession() {
+        let position = cameraPosition
+        currentPosition = position
         sessionQueue.async { [weak self] in
             guard let self else { return }
             if !self.session.inputs.isEmpty {
                 if !self.session.isRunning {
                     self.session.startRunning()
-                    Task { @MainActor in self.isSessionRunning = true }
+                    Task { @MainActor [weak self] in self?.isSessionRunning = true }
                 }
                 return
             }
 
-            self.configureSession(position: self.cameraPosition)
+            self.configureSession(position: position)
             self.session.startRunning()
-            Task { @MainActor in self.isSessionRunning = true }
+            Task { @MainActor [weak self] in self?.isSessionRunning = true }
         }
     }
 
@@ -75,13 +80,14 @@ final class CameraService: NSObject {
         sessionQueue.async { [weak self] in
             guard let self, self.session.isRunning else { return }
             self.session.stopRunning()
-            Task { @MainActor in self.isSessionRunning = false }
+            Task { @MainActor [weak self] in self?.isSessionRunning = false }
         }
     }
 
     func toggleCamera() {
         let nextPosition: AVCaptureDevice.Position = (cameraPosition == .back) ? .front : .back
         cameraPosition = nextPosition
+        currentPosition = nextPosition
         zoomFactor = 1.0
         sessionQueue.async { [weak self] in
             self?.configureSession(position: nextPosition)
@@ -97,9 +103,7 @@ final class CameraService: NSObject {
                 let clamped = max(device.minAvailableVideoZoomFactor, min(factor, min(device.maxAvailableVideoZoomFactor, 5.0)))
                 device.videoZoomFactor = clamped
                 device.unlockForConfiguration()
-            } catch {
-                // Ignore if device is busy
-            }
+            } catch {}
         }
     }
 
@@ -117,9 +121,7 @@ final class CameraService: NSObject {
                     device.exposureMode = .autoExpose
                 }
                 device.unlockForConfiguration()
-            } catch {
-                // Ignore if device is busy
-            }
+            } catch {}
         }
     }
 
@@ -131,31 +133,32 @@ final class CameraService: NSObject {
                 let clamped = max(device.minExposureTargetBias, min(bias, device.maxExposureTargetBias))
                 device.setExposureTargetBias(clamped)
                 device.unlockForConfiguration()
-            } catch {
-                // Ignore if device is busy
-            }
+            } catch {}
         }
     }
 
     func toggleFlash() {
         flashMode = (flashMode == .off) ? .on : .off
+        currentFlashMode = flashMode
     }
 
     func capturePhoto() async throws -> UIImage {
-        try await withCheckedThrowingContinuation { continuation in
+        let flash = flashMode
+        currentFlashMode = flash
+        return try await withCheckedThrowingContinuation { continuation in
             self.photoContinuation = continuation
             sessionQueue.async { [weak self] in
                 guard let self else { return }
                 let settings = AVCapturePhotoSettings()
-                if self.photoOutput.supportedFlashModes.contains(self.flashMode) {
-                    settings.flashMode = self.flashMode
+                if self.photoOutput.supportedFlashModes.contains(flash) {
+                    settings.flashMode = flash
                 }
                 self.photoOutput.capturePhoto(with: settings, delegate: self)
             }
         }
     }
 
-    private func configureSession(position: AVCaptureDevice.Position) {
+    nonisolated private func configureSession(position: AVCaptureDevice.Position) {
         session.beginConfiguration()
         session.sessionPreset = .photo
 
@@ -168,7 +171,7 @@ final class CameraService: NSObject {
               let input = try? AVCaptureDeviceInput(device: device),
               session.canAddInput(input) else {
             session.commitConfiguration()
-            Task { @MainActor in self.lastError = .configurationFailed }
+            Task { @MainActor [weak self] in self?.lastError = .configurationFailed }
             return
         }
 
@@ -180,7 +183,7 @@ final class CameraService: NSObject {
             videoOutput.videoSettings = [
                 kCVPixelBufferPixelFormatTypeKey as String: kCVPixelFormatType_420YpCbCr8BiPlanarFullRange
             ]
-            videoOutput.setSampleBufferDelegate(self, queue: DispatchQueue(label: "com.superposelabs.camera.video"))
+            videoOutput.setSampleBufferDelegate(self, queue: videoQueue)
             if session.canAddOutput(videoOutput) {
                 session.addOutput(videoOutput)
             }
@@ -222,6 +225,7 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
+        let data = photo.fileDataRepresentation()
         Task { @MainActor [weak self] in
             guard let self else { return }
             if let error {
@@ -230,8 +234,7 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
                 return
             }
 
-            guard let data = photo.fileDataRepresentation(),
-                  let image = UIImage(data: data) else {
+            guard let data, let image = UIImage(data: data) else {
                 self.photoContinuation?.resume(throwing: CameraError.captureFailed)
                 self.photoContinuation = nil
                 return
