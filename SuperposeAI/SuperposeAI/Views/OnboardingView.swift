@@ -13,73 +13,87 @@ struct OnboardingView: View {
             )
             .ignoresSafeArea()
 
-            VStack(alignment: .leading, spacing: 24) {
-                VStack(alignment: .leading, spacing: 8) {
-                    Label("Superpose", systemImage: "figure.stand.line.dotted.figure.stand")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.cyan)
-
-                    Text("What would you like help with first?")
-                        .font(.largeTitle.bold())
-                        .foregroundStyle(.white)
-
-                    Text("Snap one photo to get tailored pose ideas, split coaching tips, and live camera outlines.")
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                .padding(.top, 24)
-
-                VStack(spacing: 12) {
-                    ForEach(PoseUseCase.allCases) { useCase in
-                        Button {
-                            selectedUseCase = useCase
-                        } label: {
-                            HStack(spacing: 14) {
-                                Image(systemName: useCase.icon)
-                                    .font(.title3)
-                                    .frame(width: 40, height: 40)
-                                    .background(selectedUseCase == useCase ? Color.cyan.opacity(0.2) : Color.white.opacity(0.08))
-                                    .clipShape(RoundedRectangle(cornerRadius: 12))
-
-                                VStack(alignment: .leading, spacing: 2) {
-                                    Text(useCase.rawValue)
-                                        .font(.headline)
-                                        .foregroundStyle(.white)
-                                    Text(useCase.subtitle)
-                                        .font(.caption)
-                                        .foregroundStyle(.secondary)
-                                }
-
-                                Spacer()
-
-                                Image(systemName: selectedUseCase == useCase ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(selectedUseCase == useCase ? .cyan : .secondary)
+            ScrollView {
+                VStack(alignment: .leading, spacing: 20) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        HStack {
+                            Label("Superpose", systemImage: "figure.stand.line.dotted.figure.stand")
+                                .font(.subheadline.weight(.semibold))
+                                .foregroundStyle(.cyan)
+                            Spacer()
+                            Button("Skip") {
+                                finishOnboarding()
                             }
-                            .padding(14)
-                            .background(
-                                RoundedRectangle(cornerRadius: 16)
-                                    .fill(Color.white.opacity(selectedUseCase == useCase ? 0.12 : 0.05))
-                                    .stroke(selectedUseCase == useCase ? Color.cyan.opacity(0.6) : Color.white.opacity(0.08), lineWidth: 1)
-                            )
+                            .font(.subheadline.weight(.medium))
+                            .foregroundStyle(.secondary)
                         }
-                        .buttonStyle(.plain)
+
+                        Text("What would you like help with first?")
+                            .font(.title.bold())
+                            .foregroundStyle(.white)
+
+                        Text("Snap one photo to get tailored pose ideas, split coaching tips, and live camera outlines.")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
+                    .padding(.top, 16)
+
+                    VStack(spacing: 10) {
+                        ForEach(PoseUseCase.allCases) { useCase in
+                            Button {
+                                if selectedUseCase == useCase {
+                                    finishOnboarding()
+                                } else {
+                                    selectedUseCase = useCase
+                                }
+                            } label: {
+                                HStack(spacing: 14) {
+                                    Image(systemName: useCase.icon)
+                                        .font(.title3)
+                                        .frame(width: 40, height: 40)
+                                        .background(selectedUseCase == useCase ? Color.cyan.opacity(0.2) : Color.white.opacity(0.08))
+                                        .clipShape(RoundedRectangle(cornerRadius: 12))
+
+                                    VStack(alignment: .leading, spacing: 2) {
+                                        Text(useCase.rawValue)
+                                            .font(.headline)
+                                            .foregroundStyle(.white)
+                                        Text(useCase.subtitle)
+                                            .font(.caption)
+                                            .foregroundStyle(.secondary)
+                                    }
+
+                                    Spacer()
+
+                                    Image(systemName: selectedUseCase == useCase ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selectedUseCase == useCase ? .cyan : .secondary)
+                                }
+                                .padding(14)
+                                .background(
+                                    RoundedRectangle(cornerRadius: 16)
+                                        .fill(Color.white.opacity(selectedUseCase == useCase ? 0.12 : 0.05))
+                                        .stroke(selectedUseCase == useCase ? Color.cyan.opacity(0.6) : Color.white.opacity(0.08), lineWidth: 1)
+                                )
+                            }
+                            .buttonStyle(.plain)
+                        }
                     }
                 }
-
-                Spacer()
-
-                VStack(spacing: 12) {
+                .padding(.horizontal, 20)
+                .padding(.bottom, 24)
+            }
+            .safeAreaInset(edge: .bottom) {
+                VStack(spacing: 10) {
                     HStack(spacing: 8) {
                         Image(systemName: "lock.shield.fill")
                             .foregroundStyle(.green)
-                        Text("Live camera guidance runs 100% on your iPhone. Photos are never used to train AI models.")
+                        Text("Live camera guidance runs 100% on your iPhone.")
                             .font(.caption)
                             .foregroundStyle(.secondary)
                     }
 
                     Button {
-                        appState.preferredUseCase = selectedUseCase
-                        appState.hasCompletedOnboarding = true
+                        finishOnboarding()
                     } label: {
                         Text("Start Shooting")
                             .font(.headline)
@@ -90,9 +104,16 @@ struct OnboardingView: View {
                             .clipShape(RoundedRectangle(cornerRadius: 16))
                     }
                 }
+                .padding(.horizontal, 20)
+                .padding(.top, 10)
                 .padding(.bottom, 12)
+                .background(.ultraThinMaterial)
             }
-            .padding(.horizontal, 20)
         }
+    }
+
+    private func finishOnboarding() {
+        appState.preferredUseCase = selectedUseCase
+        appState.hasCompletedOnboarding = true
     }
 }
