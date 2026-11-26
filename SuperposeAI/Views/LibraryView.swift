@@ -178,14 +178,14 @@ struct ResultViewerSheet: View {
                             Text("Diyafram")
                                 .font(.caption2.bold())
                                 .foregroundStyle(.secondary)
-                            Slider(value: $bokehSigma, in: 4...22, step: 2) { _ in } onEditingChanged: { editing in
-                                guard !editing, let original = libraryStore.image(for: item) else { return }
-                                isApplyingBokeh = true
-                                Task {
-                                    bokehBaseImage = await PoseVisionService.applyPortraitBokeh(to: original, blurSigma: bokehSigma)
-                                    isApplyingBokeh = false
-                                }
-                            }
+                            Slider(value: $bokehSigma, in: 4...22, step: 2, onEditingChanged: { editing in
+    guard !editing, let original = libraryStore.image(for: item) else { return }
+    isApplyingBokeh = true
+    Task {
+        bokehBaseImage = await PoseVisionService.applyPortraitBokeh(to: original, blurSigma: bokehSigma)
+        isApplyingBokeh = false
+    }
+})
                             .tint(.cyan)
                             Text(String(format: "f/%.1f", max(1.4, 6.2 - (bokehSigma / 4.5))))
                                 .font(.caption2.monospacedDigit().bold())
