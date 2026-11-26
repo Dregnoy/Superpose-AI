@@ -8,7 +8,7 @@
 - **4'lü AI Poz Fikirleri (`AIPoseGeneratorService` & `PoseResultsSheet`):** Tek deneme fotoğrafından 4 poz varyasyonu üretme, seçilen pozu kameraya sabitleme (Pin).
 - **Çift Taraflı Koçluk (`CoachingSheet`):** Poz veren kişi (Subject) ve fotoğrafçı (Photographer) için ayrılmış adım adım ipuçları.
 - **Kütüphane ve Çoklu Seçim (`LibraryView`):** Yerel kaydetme, çoklu seçimle silme, Apple Fotoğraflar'a aktarma ve *Match Pose*.
-- **Shot Pack Ekonomisi (`ShotPackStore` & `Products.storekit`):** Abonelik olmadan günlük ücretsiz Shot Pack + StoreKit 2 tek seferlik Starter Pack (\$2.99) ve Value Pack (\$9.99).
+
 
 ## macOS Üzerinde Xcode ile Çalıştırma
 Bu proje Windows ortamında oluşturulduğu için derleme ve iPhone simülatör/cihaz çalıştırması macOS üzerinde yapılmalıdır:
