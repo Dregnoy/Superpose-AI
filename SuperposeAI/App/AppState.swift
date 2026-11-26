@@ -148,4 +148,20 @@ final class AppState {
         requestedZoomFactor = item.zoomFactor
         selectedTab = .camera
     }
+
+    func swapCouplesPose() {
+        guard let current = pinnedPose, let second = current.secondarySkeleton else { return }
+        pinnedPose = PoseIdea(
+            id: current.id,
+            title: current.title,
+            angleLabel: current.angleLabel,
+            confidenceTag: current.confidenceTag,
+            category: current.category,
+            skeleton: second,
+            secondarySkeleton: current.skeleton,
+            coaching: current.coaching,
+            previewImageFilename: current.previewImageFilename,
+            createdAt: current.createdAt
+        )
+    }
 }

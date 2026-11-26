@@ -94,6 +94,15 @@ struct LibraryView: View {
                                 Label("Kaydet (\(selectedIDs.count))", systemImage: "square.and.arrow.down")
                             }
 
+                            if selectedIDs.count == 2 || selectedIDs.count == 4 {
+                                Spacer()
+                                Button {
+                                    createCollage(from: selectedIDs)
+                                } label: {
+                                    Label("Kolaj", systemImage: "square.grid.2x2")
+                                }
+                            }
+
                             Spacer()
 
                             Button(role: .destructive) {
@@ -178,6 +187,63 @@ struct LibraryView: View {
             } else {
                 viewingItem = item
             }
+        }
+    }
+
+    @MainActor
+    private func createCollage(from ids: Set<UUID>) {
+        let images = libraryStore.items
+            .filter { ids.contains($0.id) }
+            .compactMap { libraryStore.image(for: $0) }
+        guard images.count == 2 || images.count == 4 else { return }
+
+        let collageView: some View = Group {
+            if images.count == 2 {
+                HStack(spacing: 6) {
+                    ForEach(0..<2, id: \.self) { idx in
+                        Image(uiImage: images[idx])
+                            .resizable()
+                            .scaledToFill()
+                            .frame(width: 530, height: 1330)
+                            .clipped()
+                            .clipShape(RoundedRectangle(cornerRadius: 14))
+                    }
+                }
+            } else {
+                VStack(spacing: 6) {
+                    HStack(spacing: 6) {
+                        ForEach(0..<2, id: \.self) { idx in
+                            Image(uiImage: images[idx])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 530, height: 660)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                    HStack(spacing: 6) {
+                        ForEach(2..<4, id: \.self) { idx in
+                            Image(uiImage: images[idx])
+                                .resizable()
+                                .scaledToFill()
+                                .frame(width: 530, height: 660)
+                                .clipped()
+                                .clipShape(RoundedRectangle(cornerRadius: 14))
+                        }
+                    }
+                }
+            }
+        }
+        .padding(10)
+        .background(Color.black)
+
+        let renderer = ImageRenderer(content: collageView)
+        renderer.scale = 1.0
+        if let collageImage = renderer.uiImage {
+            libraryStore.saveCapturedPhoto(collageImage)
+            selectedIDs.removeAll()
+            isMultiSelectMode = false
+            poseExtractAlert = "Kolaj oluşturuldu ve kütüphaneye eklendi."
         }
     }
 }

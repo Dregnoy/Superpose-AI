@@ -11,6 +11,7 @@ final class HorizonLevelService {
     var flatLayOffsetX: Double = 0.0
     var flatLayOffsetY: Double = 0.0
     var isFlatLayOrientation: Bool = false
+    var isShaking: Bool = false
     var isFlatLayAligned: Bool {
         isFlatLayOrientation && hypot(flatLayOffsetX, flatLayOffsetY) < 0.06
     }
@@ -26,11 +27,14 @@ final class HorizonLevelService {
             let isFlat = abs(accel.z) > 0.78
             let ox = accel.x
             let oy = accel.y
+            let mag = sqrt(accel.x * accel.x + accel.y * accel.y + accel.z * accel.z)
+            let shaking = abs(mag - 1.0) > 0.14
             Task { @MainActor in
                 self.rollDegrees = angle
                 self.isFlatLayOrientation = isFlat
                 self.flatLayOffsetX = ox
                 self.flatLayOffsetY = oy
+                self.isShaking = shaking
             }
         }
     }

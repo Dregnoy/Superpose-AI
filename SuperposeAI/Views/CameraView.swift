@@ -186,10 +186,19 @@ struct CameraView: View {
                 .scaleEffect(x: appState.isOverlayMirrored ? -1 : 1, y: 1)
             }
 
-            // Subtle Eye Blink, Background Line, Face Angle & Couples Balance Alerts
-            if visionService.guidance.eyesClosed || visionService.guidance.backgroundPoleWarning || visionService.guidance.couplesBalanceHint != nil || visionService.guidance.faceAngleHint != nil {
+            // Subtle Eye Blink, Background Line, Face Angle, Shake & Couples Balance Alerts
+            let showShakeAlert = horizonService.isShaking && (isProMode && manualShutter >= 0.04)
+            if visionService.guidance.eyesClosed || visionService.guidance.backgroundPoleWarning || visionService.guidance.couplesBalanceHint != nil || visionService.guidance.faceAngleHint != nil || showShakeAlert {
                 VStack(spacing: 6) {
                     Spacer().frame(height: 96)
+                    if showShakeAlert {
+                        Label("Telefonu sabit tut", systemImage: "hand.raised.fill")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.red.opacity(0.85), in: Capsule())
+                            .foregroundStyle(.white)
+                    }
                     if visionService.guidance.eyesClosed {
                         Label("Gözler Kapalı", systemImage: "eye.slash")
                             .font(.caption2.bold())
@@ -410,6 +419,16 @@ struct CameraView: View {
                                 .padding(.vertical, 4)
                                 .background(Color.cyan, in: Capsule())
                                 .foregroundStyle(.black)
+                        }
+                        if pinned.secondarySkeleton != nil {
+                            Button {
+                                appState.swapCouplesPose()
+                                showToast("Pozlar yer değiştirildi")
+                            } label: {
+                                Image(systemName: "arrow.left.arrow.right")
+                                    .font(.caption)
+                                    .foregroundStyle(.cyan)
+                            }
                         }
                         Button {
                             appState.isOverlayMirrored.toggle()

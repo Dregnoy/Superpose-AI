@@ -30,6 +30,20 @@ struct ShotPacksView: View {
                     Text("Tüm poz önerileri, ilham aktarımı ve canlı kamera rehberliği tamamen ücretsiz ve sınırsızdır.")
                 }
 
+                Section("Işık Zamanı Rehberi") {
+                    HStack {
+                        Image(systemName: "sun.horizon.fill")
+                            .foregroundStyle(.orange)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(currentLightWindowTitle())
+                                .font(.subheadline.bold())
+                            Text(currentLightWindowTip())
+                                .font(.caption2)
+                                .foregroundStyle(.secondary)
+                        }
+                    }
+                }
+
                 Section("Kompozisyon Görevleri") {
                     missionButton(
                         title: "Çerçeveleme Dene",
@@ -122,6 +136,28 @@ struct ShotPacksView: View {
                 Image(systemName: icon)
                     .foregroundStyle(.cyan)
             }
+        }
+    }
+
+    private func currentLightWindowTitle() -> String {
+        let hour = Calendar.current.component(.hour, from: .now)
+        switch hour {
+        case 5...7: return "Sabah Altın / Mavi Saat"
+        case 8...10: return "Yumuşak Sabah Işığı"
+        case 11...15: return "Sert Öğle Işığı"
+        case 16...18: return "Akşam Altın Saat"
+        case 19...20: return "Mavi Saat (Şehir Işıkları)"
+        default: return "Gece / Düşük Işık"
+        }
+    }
+
+    private func currentLightWindowTip() -> String {
+        let hour = Calendar.current.component(.hour, from: .now)
+        switch hour {
+        case 5...7, 16...18: return "Portre ve silüet için en yumuşak sıcak ışık zamanı."
+        case 19...20: return "Mavi gökyüzü ve şehir ışıkları için Mavi Saat tonunu deneyin."
+        case 11...15: return "Sert gölgelerden kaçınmak için gölge veya ters ışık kullanın."
+        default: return "PRO modda Loş/Gölge hazır ayarını veya Gece HUD'u deneyin."
         }
     }
 }
