@@ -40,12 +40,31 @@ final class AppState {
         }
     }
     var pinnedGhostMask: UIImage?
+    var pinnedReferencePhoto: UIImage?
+    var isOverlayMirrored: Bool = false
+    var ghostOpacity: Double = 0.28
     var overlayMode: OverlayMode = .fastSilhouette
     var aspectGuideMode: AspectGuideMode = .full
     var isAutoShutterEnabled: Bool = false
     var isVoiceCoachEnabled: Bool = false
     var gridMode: GridMode = .off
     var isNightHudEnabled: Bool = false
+    var isHapticsEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isHapticsEnabled, forKey: "isHapticsEnabled")
+        }
+    }
+    var voiceCoachFast: Bool {
+        didSet {
+            UserDefaults.standard.set(voiceCoachFast, forKey: "voiceCoachFast")
+        }
+    }
+    var isSmileShutterEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(isSmileShutterEnabled, forKey: "isSmileShutterEnabled")
+        }
+    }
+    var pendingCameraTip: String? = nil
     var requestedZoomFactor: Double? = nil
     var latestGeneratedPoses: [PoseIdea] = []
     var savedCustomPoses: [PoseIdea] = [] {
@@ -78,6 +97,13 @@ final class AppState {
         } else {
             self.autoEnhancePhotos = UserDefaults.standard.bool(forKey: "autoEnhancePhotos")
         }
+        if UserDefaults.standard.object(forKey: "isHapticsEnabled") == nil {
+            self.isHapticsEnabled = true
+        } else {
+            self.isHapticsEnabled = UserDefaults.standard.bool(forKey: "isHapticsEnabled")
+        }
+        self.voiceCoachFast = UserDefaults.standard.bool(forKey: "voiceCoachFast")
+        self.isSmileShutterEnabled = UserDefaults.standard.bool(forKey: "isSmileShutterEnabled")
         self.geminiAPIKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
         if let data = UserDefaults.standard.data(forKey: "savedCustomPoses"),
            let decoded = try? JSONDecoder().decode([PoseIdea].self, from: data) {
@@ -113,6 +139,12 @@ final class AppState {
         } else if item.poseIdea != nil && overlayMode == .off {
             overlayMode = .fastSilhouette
         }
+        requestedZoomFactor = item.zoomFactor
+        selectedTab = .camera
+    }
+
+    func startGhostReference(_ image: UIImage, item: LibraryItem) {
+        pinnedReferencePhoto = image
         requestedZoomFactor = item.zoomFactor
         selectedTab = .camera
     }

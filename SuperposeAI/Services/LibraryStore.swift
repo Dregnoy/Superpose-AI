@@ -29,7 +29,8 @@ final class LibraryStore {
         isGeneratedReference: Bool = false,
         poseIdea: PoseIdea? = nil,
         zoomFactor: Double? = nil,
-        overlayModeRaw: String? = nil
+        overlayModeRaw: String? = nil,
+        rollDegrees: Double? = nil
     ) {
         let filename = "\(UUID().uuidString).jpg"
         let fileURL = libraryDirectory.appendingPathComponent(filename)
@@ -42,7 +43,8 @@ final class LibraryStore {
             isGeneratedReference: isGeneratedReference,
             poseIdea: poseIdea,
             zoomFactor: zoomFactor,
-            overlayModeRaw: overlayModeRaw
+            overlayModeRaw: overlayModeRaw,
+            rollDegrees: rollDegrees
         )
         items.insert(item, at: 0)
         persist()
@@ -88,6 +90,21 @@ final class LibraryStore {
                 PHAssetChangeRequest.creationRequestForAssetFromVideo(atFileURL: fileURL)
             }
             try? FileManager.default.removeItem(at: fileURL)
+            return true
+        } catch {
+            return false
+        }
+    }
+
+    func saveRAWToApplePhotos(_ dngData: Data) async -> Bool {
+        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+        guard status == .authorized || status == .limited else { return false }
+
+        do {
+            try await PHPhotoLibrary.shared().performChanges {
+                let request = PHAssetCreationRequest.forAsset()
+                request.addResource(with: .photo, data: dngData, options: nil)
+            }
             return true
         } catch {
             return false

@@ -240,8 +240,10 @@ struct LiveGuidanceState: Equatable {
     var lumaScore: Double = 0.5
     var poseMatchScore: Int? = nil
     var eyesClosed: Bool = false
+    var isGoodSmile: Bool = false
     var backgroundPoleWarning: Bool = false
     var couplesBalanceHint: String? = nil
+    var faceAngleHint: String? = nil
     var detectedSkeleton: PoseSkeleton? = nil
     var detectedSecondarySkeleton: PoseSkeleton? = nil
 }
@@ -255,6 +257,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
     let poseIdea: PoseIdea?
     let zoomFactor: Double?
     let overlayModeRaw: String?
+    let rollDegrees: Double?
     let createdAt: Date
 
     init(
@@ -264,6 +267,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
         poseIdea: PoseIdea? = nil,
         zoomFactor: Double? = nil,
         overlayModeRaw: String? = nil,
+        rollDegrees: Double? = nil,
         createdAt: Date = .now
     ) {
         self.id = id
@@ -272,6 +276,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
         self.poseIdea = poseIdea
         self.zoomFactor = zoomFactor
         self.overlayModeRaw = overlayModeRaw
+        self.rollDegrees = rollDegrees
         self.createdAt = createdAt
     }
 }

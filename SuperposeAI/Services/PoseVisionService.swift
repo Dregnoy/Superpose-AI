@@ -74,6 +74,8 @@ final class PoseVisionService {
                 upperBodyOnly: isUpperBodyMode
             )
             let eyesClosed = Self.areEyesClosed(in: faceRequest.results)
+            let isGoodSmile = !eyesClosed && Self.isSmiling(in: faceRequest.results)
+            let faceAngleHint = Self.faceAngleHint(in: faceRequest.results)
             let couplesHint = Self.evaluateCouplesBalance(first: detectedSkeleton, second: detectedSecondary)
             let poleWarning = Self.detectVerticalLineBehindHead(in: pixelBuffer, nose: detectedSkeleton?.joints[.nose])
             let matchScore: Int? = {
@@ -94,8 +96,10 @@ final class PoseVisionService {
                     lumaScore: luma,
                     poseMatchScore: matchScore,
                     eyesClosed: eyesClosed,
+                    isGoodSmile: isGoodSmile,
                     backgroundPoleWarning: poleWarning,
                     couplesBalanceHint: couplesHint,
+                    faceAngleHint: faceAngleHint,
                     detectedSkeleton: detectedSkeleton,
                     detectedSecondarySkeleton: detectedSecondary
                 )
@@ -236,6 +240,36 @@ final class PoseVisionService {
         guard !ratios.isEmpty else { return false }
         let avgEAR = ratios.reduce(0, +) / CGFloat(ratios.count)
         return avgEAR < 0.14
+    }
+
+    nonisolated private static func faceAngleHint(in faces: [VNFaceObservation]?) -> String? {
+        guard let face = faces?.first else { return nil }
+        if let roll = face.roll?.doubleValue, abs(roll) > 0.28 {
+            return "Başını biraz düz tut"
+        }
+        if let yaw = face.yaw?.doubleValue, abs(yaw) > 0.55 {
+            return "Yüzünü biraz kameraya dön"
+        }
+        return nil
+    }
+
+    nonisolated private static func isSmiling(in faces: [VNFaceObservation]?) -> Bool {
+        guard let face = faces?.first,
+              let lips = face.landmarks?.outerLips?.normalizedPoints,
+              lips.count >= 6 else { return false }
+        let xs = lips.map(\.x)
+        let ys = lips.map(\.y)
+        guard let minX = xs.min(), let maxX = xs.max(),
+              let minY = ys.min(), let maxY = ys.max() else { return false }
+        let width = maxX - minX
+        let height = maxY - minY
+        guard width > 0.08, height > 0.01 else { return false }
+        // Wide mouth + corner points raised relative to center
+        let leftCorner = lips.min(by: { $0.x < $1.x })
+        let rightCorner = lips.max(by: { $0.x < $1.x })
+        let midY = (minY + maxY) / 2.0
+        let cornersRaised = ((leftCorner?.y ?? midY) + (rightCorner?.y ?? midY)) / 2.0 >= midY - 0.01
+        return (width / height) > 2.2 && cornersRaised
     }
 
     // MARK: - Couples Depth/Size Balance

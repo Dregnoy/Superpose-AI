@@ -1,6 +1,7 @@
 import SwiftUI
 import CoreImage
 import Photos
+import PhotosUI
 
 struct LibraryView: View {
     @Environment(AppState.self) private var appState
@@ -9,6 +10,10 @@ struct LibraryView: View {
     @State private var isMultiSelectMode = false
     @State private var selectedIDs: Set<UUID> = []
     @State private var viewingItem: LibraryItem?
+    @State private var filterPosedOnly = false
+    @State private var pickedPhotoItem: PhotosPickerItem?
+    @State private var isExtractingPose = false
+    @State private var poseExtractAlert: String?
 
     private let columns = [
         GridItem(.flexible(), spacing: 3),
@@ -27,8 +32,20 @@ struct LibraryView: View {
                     )
                 } else {
                     ScrollView {
+                        Picker("Filtre", selection: $filterPosedOnly) {
+                            Text("Tümü").tag(false)
+                            Text("Pozlu Çekimler").tag(true)
+                        }
+                        .pickerStyle(.segmented)
+                        .padding(.horizontal)
+                        .padding(.vertical, 6)
+
+                        let displayedItems = filterPosedOnly
+                            ? libraryStore.items.filter { $0.poseIdea != nil }
+                            : libraryStore.items
+
                         LazyVGrid(columns: columns, spacing: 3) {
-                            ForEach(libraryStore.items) { item in
+                            ForEach(displayedItems) { item in
                                 libraryThumbnail(item)
                             }
                         }
@@ -37,6 +54,17 @@ struct LibraryView: View {
             }
             .navigationTitle("Kütüphane")
             .toolbar {
+                ToolbarItem(placement: .topBarLeading) {
+                    PhotosPicker(selection: $pickedPhotoItem, matching: .images) {
+                        if isExtractingPose {
+                            ProgressView()
+                        } else {
+                            Label("Poz Çıkar", systemImage: "photo.badge.plus")
+                        }
+                    }
+                    .disabled(isExtractingPose)
+                }
+
                 if !libraryStore.items.isEmpty {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button(isMultiSelectMode ? "Bitti" : "Seç") {
@@ -48,18 +76,73 @@ struct LibraryView: View {
 
                 if isMultiSelectMode && !selectedIDs.isEmpty {
                     ToolbarItem(placement: .bottomBar) {
-                        Button(role: .destructive) {
-                            libraryStore.deleteItems(ids: selectedIDs)
-                            selectedIDs.removeAll()
-                            isMultiSelectMode = false
-                        } label: {
-                            Label("Sil (\(selectedIDs.count))", systemImage: "trash")
+                        HStack {
+                            Button {
+                                let idsToSave = selectedIDs
+                                Task {
+                                    var savedCount = 0
+                                    for item in libraryStore.items where idsToSave.contains(item.id) {
+                                        if await libraryStore.saveToApplePhotos(item) {
+                                            savedCount += 1
+                                        }
+                                    }
+                                    selectedIDs.removeAll()
+                                    isMultiSelectMode = false
+                                    poseExtractAlert = "\(savedCount) fotoğraf Apple Fotoğraflar'a kaydedildi."
+                                }
+                            } label: {
+                                Label("Kaydet (\(selectedIDs.count))", systemImage: "square.and.arrow.down")
+                            }
+
+                            Spacer()
+
+                            Button(role: .destructive) {
+                                libraryStore.deleteItems(ids: selectedIDs)
+                                selectedIDs.removeAll()
+                                isMultiSelectMode = false
+                            } label: {
+                                Label("Sil (\(selectedIDs.count))", systemImage: "trash")
+                            }
                         }
                     }
                 }
             }
             .sheet(item: $viewingItem) { item in
                 ResultViewerSheet(item: item)
+            }
+            .onChange(of: pickedPhotoItem) { _, newItem in
+                guard let newItem else { return }
+                isExtractingPose = true
+                Task {
+                    defer {
+                        isExtractingPose = false
+                        pickedPhotoItem = nil
+                    }
+                    guard let data = try? await newItem.loadTransferable(type: Data.self),
+                          let uiImage = UIImage(data: data) else {
+                        poseExtractAlert = "Fotoğraf yüklenemedi."
+                        return
+                    }
+                    let vision = PoseVisionService()
+                    guard let pose = await vision.extractPose(from: uiImage) else {
+                        poseExtractAlert = "Seçilen fotoğrafta kişi algılanamadı."
+                        return
+                    }
+                    let mask = await vision.extractPersonSilhouette(from: uiImage)
+                    if !appState.isPoseSaved(pose) {
+                        appState.toggleSavePose(pose)
+                    }
+                    appState.pinnedGhostMask = mask
+                    appState.pinPoseAndSwitchToCamera(pose)
+                }
+            }
+            .alert("Fotoğraftan Poz", isPresented: Binding(
+                get: { poseExtractAlert != nil },
+                set: { if !$0 { poseExtractAlert = nil } }
+            )) {
+                Button("Tamam", role: .cancel) {}
+            } message: {
+                Text(poseExtractAlert ?? "")
             }
         }
     }
@@ -112,6 +195,14 @@ struct ResultViewerSheet: View {
         var id: String { rawValue }
     }
 
+    enum CropRatio: String, CaseIterable, Identifiable {
+        case original = "Tam"
+        case feed4x5 = "4:5"
+        case story9x16 = "9:16"
+
+        var id: String { rawValue }
+    }
+
     @Environment(AppState.self) private var appState
     @Environment(LibraryStore.self) private var libraryStore
     @Environment(\.dismiss) private var dismiss
@@ -119,22 +210,44 @@ struct ResultViewerSheet: View {
     let item: LibraryItem
     @State private var savedToPhotos = false
     @State private var selectedTone: PhotoTone = .original
+    @State private var selectedCrop: CropRatio = .original
+    @State private var isComparingOriginal = false
     @State private var isPortraitBokeh = false
     @State private var bokehSigma: Double = 12.0
     @State private var bokehBaseImage: UIImage?
     @State private var isApplyingBokeh = false
     @State private var isNaturalEnhanced = false
+    @State private var isHorizonStraightened = false
+    @State private var exposureAdjust: Double = 0.0
+    @State private var warmthAdjust: Double = 0.0
     @State private var enhancedCache: UIImage?
 
     var body: some View {
         NavigationStack {
             VStack(spacing: 14) {
-                if let displayImage = styledImage() {
-                    Image(uiImage: displayImage)
-                        .resizable()
-                        .scaledToFit()
-                        .clipShape(RoundedRectangle(cornerRadius: 16))
-                        .padding(.horizontal)
+                if let displayImage = isComparingOriginal ? libraryStore.image(for: item) : styledImage() {
+                    ZStack(alignment: .topLeading) {
+                        Image(uiImage: displayImage)
+                            .resizable()
+                            .scaledToFit()
+                            .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                        if isComparingOriginal {
+                            Text("ORİJİNAL")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 8)
+                                .padding(.vertical, 4)
+                                .background(.black.opacity(0.7), in: Capsule())
+                                .foregroundStyle(.white)
+                                .padding(10)
+                        }
+                    }
+                    .padding(.horizontal)
+                    .gesture(
+                        DragGesture(minimumDistance: 0)
+                            .onChanged { _ in isComparingOriginal = true }
+                            .onEnded { _ in isComparingOriginal = false }
+                    )
                 }
 
                 // Minimal 3-tone selector + AI/CoreImage suggestion
@@ -151,6 +264,13 @@ struct ResultViewerSheet: View {
                     }
                     .pickerStyle(.segmented)
 
+                    Picker("Oran", selection: $selectedCrop) {
+                        ForEach(CropRatio.allCases) { ratio in
+                            Text(ratio.rawValue).tag(ratio)
+                        }
+                    }
+                    .pickerStyle(.segmented)
+
                     Toggle("Doğallaştır ve Netleştir", isOn: $isNaturalEnhanced)
                         .font(.subheadline)
                         .tint(.cyan)
@@ -159,6 +279,12 @@ struct ResultViewerSheet: View {
                                   let original = libraryStore.image(for: item) else { return }
                             enhancedCache = PhotoEnhancerService.naturalizeAndSharpen(original)
                         }
+
+                    if let roll = item.rollDegrees, abs(roll) >= 0.8 {
+                        Toggle(String(format: "Ufku Düzelt (%.1f°)", abs(roll)), isOn: $isHorizonStraightened)
+                            .font(.subheadline)
+                            .tint(.cyan)
+                    }
 
                     Toggle("Portre Bokeh (Yumuşak Arka Plan)", isOn: $isPortraitBokeh)
                         .font(.subheadline)
@@ -179,13 +305,13 @@ struct ResultViewerSheet: View {
                                 .font(.caption2.bold())
                                 .foregroundStyle(.secondary)
                             Slider(value: $bokehSigma, in: 4...22, step: 2, onEditingChanged: { editing in
-    guard !editing, let original = libraryStore.image(for: item) else { return }
-    isApplyingBokeh = true
-    Task {
-        bokehBaseImage = await PoseVisionService.applyPortraitBokeh(to: original, blurSigma: bokehSigma)
-        isApplyingBokeh = false
-    }
-})
+                                guard !editing, let original = libraryStore.image(for: item) else { return }
+                                isApplyingBokeh = true
+                                Task {
+                                    bokehBaseImage = await PoseVisionService.applyPortraitBokeh(to: original, blurSigma: bokehSigma)
+                                    isApplyingBokeh = false
+                                }
+                            })
                             .tint(.cyan)
                             Text(String(format: "f/%.1f", max(1.4, 6.2 - (bokehSigma / 4.5))))
                                 .font(.caption2.monospacedDigit().bold())
@@ -193,20 +319,56 @@ struct ResultViewerSheet: View {
                                 .frame(width: 40, alignment: .trailing)
                         }
                     }
+
+                    DisclosureGroup("İnce Ayar (Işık / Sıcaklık)") {
+                        VStack(spacing: 8) {
+                            HStack(spacing: 8) {
+                                Text("Işık")
+                                    .font(.caption2.bold())
+                                    .frame(width: 54, alignment: .leading)
+                                Slider(value: $exposureAdjust, in: -0.5...0.5)
+                                    .tint(.cyan)
+                            }
+                            HStack(spacing: 8) {
+                                Text("Sıcaklık")
+                                    .font(.caption2.bold())
+                                    .frame(width: 54, alignment: .leading)
+                                Slider(value: $warmthAdjust, in: -1500...1500)
+                                    .tint(.orange)
+                            }
+                        }
+                        .padding(.top, 4)
+                    }
+                    .font(.caption.bold())
+                    .tint(.cyan)
                 }
                 .padding(.horizontal)
 
-                HStack(spacing: 12) {
+                HStack(spacing: 10) {
                     Button {
                         dismiss()
                         appState.reshotFromLibrary(item)
                     } label: {
                         Label("Tekrar Çek", systemImage: "camera.rotate")
-                            .font(.subheadline.bold())
+                            .font(.caption.bold())
                             .frame(maxWidth: .infinity)
                             .padding(.vertical, 12)
                             .background(Color.cyan, in: RoundedRectangle(cornerRadius: 12))
                             .foregroundStyle(.black)
+                    }
+
+                    Button {
+                        if let img = libraryStore.image(for: item) {
+                            dismiss()
+                            appState.startGhostReference(img, item: item)
+                        }
+                    } label: {
+                        Label("Hayalet", systemImage: "person.fill.viewfinder")
+                            .font(.caption.bold())
+                            .frame(maxWidth: .infinity)
+                            .padding(.vertical, 12)
+                            .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                            .foregroundStyle(.white)
                     }
 
                     Button {
@@ -308,44 +470,47 @@ struct ResultViewerSheet: View {
             baseImage = enhancedCache ?? baseImage.map { PhotoEnhancerService.naturalizeAndSharpen($0) }
         }
         guard let base = baseImage else { return nil }
-        guard selectedTone != .original, let cgImage = base.cgImage else { return base }
+        let straightenedBase = (isHorizonStraightened && item.rollDegrees != nil)
+            ? straightenHorizon(base, rollDegrees: item.rollDegrees ?? 0)
+            : base
+        let croppedBase = applyCenterCrop(straightenedBase, ratio: selectedCrop)
+        let hasFineTune = abs(exposureAdjust) > 0.01 || abs(warmthAdjust) > 10
+        guard (selectedTone != .original || hasFineTune), let cgImage = croppedBase.cgImage else {
+            return croppedBase
+        }
 
         let ciImage = CIImage(cgImage: cgImage)
         let context = CIContext()
-        let output: CIImage?
+        var currentCI: CIImage = ciImage
 
         switch selectedTone {
         case .original:
-            return base
+            break
         case .golden:
             let filter = CIFilter(name: "CITemperatureAndTint")
-            filter?.setValue(ciImage, forKey: kCIInputImageKey)
+            filter?.setValue(currentCI, forKey: kCIInputImageKey)
             filter?.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
             filter?.setValue(CIVector(x: 4700, y: 18), forKey: "inputTargetNeutral")
             if let warmed = filter?.outputImage {
                 let vib = CIFilter(name: "CIVibrance")
                 vib?.setValue(warmed, forKey: kCIInputImageKey)
                 vib?.setValue(0.22, forKey: "inputAmount")
-                output = vib?.outputImage ?? warmed
-            } else {
-                output = nil
+                currentCI = vib?.outputImage ?? warmed
             }
         case .blueHour:
             let filter = CIFilter(name: "CITemperatureAndTint")
-            filter?.setValue(ciImage, forKey: kCIInputImageKey)
+            filter?.setValue(currentCI, forKey: kCIInputImageKey)
             filter?.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
             filter?.setValue(CIVector(x: 8400, y: -8), forKey: "inputTargetNeutral")
             if let cooled = filter?.outputImage {
                 let vib = CIFilter(name: "CIVibrance")
                 vib?.setValue(cooled, forKey: kCIInputImageKey)
                 vib?.setValue(0.24, forKey: "inputAmount")
-                output = vib?.outputImage ?? cooled
-            } else {
-                output = nil
+                currentCI = vib?.outputImage ?? cooled
             }
         case .dramatic:
             let controls = CIFilter(name: "CIColorControls")
-            controls?.setValue(ciImage, forKey: kCIInputImageKey)
+            controls?.setValue(currentCI, forKey: kCIInputImageKey)
             controls?.setValue(1.18, forKey: kCIInputContrastKey)
             controls?.setValue(0.88, forKey: kCIInputSaturationKey)
             if let contrasted = controls?.outputImage {
@@ -353,21 +518,94 @@ struct ResultViewerSheet: View {
                 vignette?.setValue(contrasted, forKey: kCIInputImageKey)
                 vignette?.setValue(1.1, forKey: kCIInputIntensityKey)
                 vignette?.setValue(1.8, forKey: kCIInputRadiusKey)
-                output = vignette?.outputImage ?? contrasted
-            } else {
-                output = nil
+                currentCI = vignette?.outputImage ?? contrasted
             }
         case .noir:
             let filter = CIFilter(name: "CIPhotoEffectNoir")
-            filter?.setValue(ciImage, forKey: kCIInputImageKey)
-            output = filter?.outputImage
+            filter?.setValue(currentCI, forKey: kCIInputImageKey)
+            if let noirImg = filter?.outputImage { currentCI = noirImg }
         }
 
-        guard let finalCI = output,
-              let finalCG = context.createCGImage(finalCI, from: ciImage.extent) else {
-            return base
+        if abs(exposureAdjust) > 0.01 {
+            let exp = CIFilter(name: "CIExposureAdjust")
+            exp?.setValue(currentCI, forKey: kCIInputImageKey)
+            exp?.setValue(exposureAdjust, forKey: kCIInputEVKey)
+            if let out = exp?.outputImage { currentCI = out }
         }
-        return UIImage(cgImage: finalCG, scale: base.scale, orientation: base.imageOrientation)
+
+        if abs(warmthAdjust) > 10 {
+            let temp = CIFilter(name: "CITemperatureAndTint")
+            temp?.setValue(currentCI, forKey: kCIInputImageKey)
+            temp?.setValue(CIVector(x: 6500, y: 0), forKey: "inputNeutral")
+            temp?.setValue(CIVector(x: 6500 - warmthAdjust, y: 0), forKey: "inputTargetNeutral")
+            if let out = temp?.outputImage { currentCI = out }
+        }
+
+        guard let finalCG = context.createCGImage(currentCI, from: ciImage.extent) else {
+            return croppedBase
+        }
+        return UIImage(cgImage: finalCG, scale: croppedBase.scale, orientation: croppedBase.imageOrientation)
+    }
+
+    private func applyCenterCrop(_ image: UIImage, ratio: CropRatio) -> UIImage {
+        let targetAspect: CGFloat
+        switch ratio {
+        case .original: return image
+        case .feed4x5: targetAspect = 4.0 / 5.0
+        case .story9x16: targetAspect = 9.0 / 16.0
+        }
+        guard let cgImage = image.cgImage else { return image }
+        let width = CGFloat(cgImage.width)
+        let height = CGFloat(cgImage.height)
+        // Account for orientation when width/height are swapped
+        let isRotated = image.imageOrientation == .left || image.imageOrientation == .right ||
+                        image.imageOrientation == .leftMirrored || image.imageOrientation == .rightMirrored
+        let displayW = isRotated ? height : width
+        let displayH = isRotated ? width : height
+        let currentAspect = displayW / displayH
+
+        var cropDisplayW = displayW
+        var cropDisplayH = displayH
+        if currentAspect > targetAspect {
+            cropDisplayW = displayH * targetAspect
+        } else {
+            cropDisplayH = displayW / targetAspect
+        }
+
+        let cropPixelW = isRotated ? cropDisplayH : cropDisplayW
+        let cropPixelH = isRotated ? cropDisplayW : cropDisplayH
+        let rect = CGRect(
+            x: (width - cropPixelW) / 2.0,
+            y: (height - cropPixelH) / 2.0,
+            width: cropPixelW,
+            height: cropPixelH
+        )
+        guard let cropped = cgImage.cropping(to: rect) else { return image }
+        return UIImage(cgImage: cropped, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    private func straightenHorizon(_ image: UIImage, rollDegrees: Double) -> UIImage {
+        let clampedDegrees = max(-15.0, min(15.0, rollDegrees))
+        guard abs(clampedDegrees) >= 0.5, let cgImage = image.cgImage else { return image }
+        let radians = CGFloat(-clampedDegrees * .pi / 180.0)
+        let ciImage = CIImage(cgImage: cgImage)
+        let extent = ciImage.extent
+        let rotated = ciImage.transformed(by: CGAffineTransform(rotationAngle: radians))
+
+        // Shrink to largest axis-aligned rect inside rotated bounds to avoid black corners
+        let absCos = abs(cos(radians))
+        let absSin = abs(sin(radians))
+        let safeW = extent.width / (absCos + (extent.height / max(1, extent.width)) * absSin)
+        let safeH = extent.height / (absCos + (extent.width / max(1, extent.height)) * absSin)
+        let cropRect = CGRect(
+            x: rotated.extent.midX - safeW / 2.0,
+            y: rotated.extent.midY - safeH / 2.0,
+            width: safeW,
+            height: safeH
+        )
+        let context = CIContext()
+        guard let resultCG = context.createCGImage(rotated, from: cropRect) else { return image }
+        return UIImage(cgImage: resultCG, scale: image.scale, orientation: image.imageOrientation)
     }
 
     private func recommendedTone() -> PhotoTone? {

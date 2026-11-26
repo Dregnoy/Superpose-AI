@@ -25,6 +25,8 @@ struct CameraView: View {
     @State private var timerSeconds: Int = 0 // 0, 3, or 10
     @State private var isBurstEnabled: Bool = false
     @State private var isVideoMode: Bool = false
+    @State private var recordingSeconds: Int = 0
+    @State private var recordingTimerTask: Task<Void, Never>?
     @State private var isProMode: Bool = false
     @State private var isFocusLocked: Bool = false
     @State private var focusPoint: CGPoint?
@@ -158,6 +160,17 @@ struct CameraView: View {
                     .allowsHitTesting(false)
             }
 
+            // Chronological / Ghost Reference Photo Overlay
+            if let refPhoto = appState.pinnedReferencePhoto {
+                Image(uiImage: refPhoto)
+                    .resizable()
+                    .scaledToFill()
+                    .scaleEffect(x: appState.isOverlayMirrored ? -1 : 1, y: 1)
+                    .ignoresSafeArea()
+                    .opacity(appState.ghostOpacity)
+                    .allowsHitTesting(false)
+            }
+
             // Pose Outline Overlay
             if let pinned = appState.pinnedPose {
                 PoseOverlayView(
@@ -170,10 +183,11 @@ struct CameraView: View {
                     matchScore: visionService.guidance.poseMatchScore,
                     isNightHud: appState.isNightHudEnabled
                 )
+                .scaleEffect(x: appState.isOverlayMirrored ? -1 : 1, y: 1)
             }
 
-            // Subtle Eye Blink, Background Line & Couples Balance Alerts
-            if visionService.guidance.eyesClosed || visionService.guidance.backgroundPoleWarning || visionService.guidance.couplesBalanceHint != nil {
+            // Subtle Eye Blink, Background Line, Face Angle & Couples Balance Alerts
+            if visionService.guidance.eyesClosed || visionService.guidance.backgroundPoleWarning || visionService.guidance.couplesBalanceHint != nil || visionService.guidance.faceAngleHint != nil {
                 VStack(spacing: 6) {
                     Spacer().frame(height: 96)
                     if visionService.guidance.eyesClosed {
@@ -190,6 +204,14 @@ struct CameraView: View {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 5)
                             .background(Color.yellow.opacity(0.9), in: Capsule())
+                            .foregroundStyle(.black)
+                    }
+                    if let faceHint = visionService.guidance.faceAngleHint {
+                        Label(faceHint, systemImage: "face.smiling")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.mint.opacity(0.9), in: Capsule())
                             .foregroundStyle(.black)
                     }
                     if let hint = visionService.guidance.couplesBalanceHint {
@@ -283,7 +305,8 @@ struct CameraView: View {
             voiceCoach.announceIfNeeded(
                 newGuidance,
                 isEnabled: appState.isVoiceCoachEnabled,
-                hasPinnedPose: appState.pinnedPose != nil
+                hasPinnedPose: appState.pinnedPose != nil,
+                fast: appState.voiceCoachFast
             )
             evaluateAutoShutter(with: newGuidance)
             evaluateMatchHaptic(with: newGuidance)
@@ -308,6 +331,12 @@ struct CameraView: View {
         .sheet(item: $previewingLatestItem) { item in
             ResultViewerSheet(item: item)
         }
+        .onChange(of: appState.pendingCameraTip) { _, tip in
+            if let tip {
+                showToast(tip)
+                appState.pendingCameraTip = nil
+            }
+        }
     }
 
     // MARK: - Top Real-Time Guidance HUD (Compact & Responsive)
@@ -330,6 +359,20 @@ struct CameraView: View {
                         .foregroundStyle(.green)
                         .padding(6)
                         .background(.ultraThinMaterial, in: Circle())
+                }
+
+                if cameraService.isRecording {
+                    HStack(spacing: 5) {
+                        Circle()
+                            .fill(Color.red)
+                            .frame(width: 8, height: 8)
+                        Text(String(format: "%02d:%02d", recordingSeconds / 60, recordingSeconds % 60))
+                            .font(.caption.monospacedDigit().bold())
+                            .foregroundStyle(.white)
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 6)
+                    .background(Color.red.opacity(0.35), in: Capsule())
                 }
 
                 Spacer(minLength: 4)
@@ -369,6 +412,13 @@ struct CameraView: View {
                                 .foregroundStyle(.black)
                         }
                         Button {
+                            appState.isOverlayMirrored.toggle()
+                        } label: {
+                            Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                                .font(.caption)
+                                .foregroundStyle(appState.isOverlayMirrored ? .cyan : .white)
+                        }
+                        Button {
                             appState.pinnedPose = nil
                         } label: {
                             Image(systemName: "xmark.circle.fill")
@@ -378,6 +428,28 @@ struct CameraView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
+                } else if appState.pinnedReferencePhoto != nil {
+                    HStack(spacing: 8) {
+                        Button {
+                            appState.isOverlayMirrored.toggle()
+                        } label: {
+                            Image(systemName: "arrow.left.and.right.righttriangle.left.righttriangle.right")
+                                .font(.caption)
+                                .foregroundStyle(appState.isOverlayMirrored ? .cyan : .white)
+                        }
+                        Slider(value: Bindable(appState).ghostOpacity, in: 0.15...0.65)
+                            .frame(width: 64)
+                            .tint(.cyan)
+                        Button {
+                            appState.pinnedReferencePhoto = nil
+                        } label: {
+                            Image(systemName: "xmark.circle.fill")
+                                .foregroundStyle(.cyan)
+                        }
+                    }
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 5)
+                    .background(.ultraThinMaterial, in: Capsule())
                 } else {
                     HStack(spacing: 6) {
                         Button {
@@ -385,18 +457,20 @@ struct CameraView: View {
                             appState.isResultsSheetPresented = true
                         } label: {
                             Label("Hızlı Poz", systemImage: "figure.stand")
-                                .font(.caption.bold())
+                                .font(.caption2.bold())
                                 .lineLimit(1)
-                                .padding(.horizontal, 10)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 9)
                                 .padding(.vertical, 7)
                                 .background(.ultraThinMaterial, in: Capsule())
                         }
 
                         PhotosPicker(selection: $selectedInspoItem, matching: .images) {
                             Label("İlham", systemImage: "photo.badge.plus")
-                                .font(.caption.bold())
+                                .font(.caption2.bold())
                                 .lineLimit(1)
-                                .padding(.horizontal, 10)
+                                .fixedSize(horizontal: true, vertical: false)
+                                .padding(.horizontal, 9)
                                 .padding(.vertical, 7)
                                 .background(.ultraThinMaterial, in: Capsule())
                         }
@@ -443,8 +517,9 @@ struct CameraView: View {
 
     private var bottomControlsHUD: some View {
         VStack(spacing: 10) {
-            // Compact Tools Strip
-            HStack(spacing: 10) {
+            // Compact Tools Strip (scrollable so OTO / PRO never truncate to "...")
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(spacing: 8) {
                 Button {
                     cameraService.toggleFlash()
                 } label: {
@@ -456,7 +531,13 @@ struct CameraView: View {
 
                 Button {
                     appState.isVoiceCoachEnabled.toggle()
-                    if !appState.isVoiceCoachEnabled { voiceCoach.stop() }
+                    if appState.isVoiceCoachEnabled {
+                        voiceCoach.speak("Sesli koç açık")
+                        showToast("Sesli koç açık")
+                    } else {
+                        voiceCoach.stop()
+                        showToast("Sesli koç kapalı")
+                    }
                 } label: {
                     Image(systemName: appState.isVoiceCoachEnabled ? "speaker.wave.2.fill" : "speaker.slash")
                         .font(.subheadline)
@@ -474,6 +555,7 @@ struct CameraView: View {
                 } label: {
                     Text("OTO")
                         .font(.caption2.bold())
+                        .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(appState.isAutoShutterEnabled ? .black : .white)
                         .padding(.horizontal, 9)
                         .frame(height: 34)
@@ -537,12 +619,15 @@ struct CameraView: View {
                     } label: {
                         Text("PRO")
                             .font(.caption2.bold())
+                            .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(isProMode ? .black : .white)
                             .padding(.horizontal, 8)
                             .frame(height: 34)
                             .background(isProMode ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
                     }
                 }
+                }
+                .padding(.horizontal, 2)
             }
 
             if isProMode && cameraService.cameraPosition == .back {
@@ -570,36 +655,55 @@ struct CameraView: View {
                 }
             }
 
-            // Compact Foto / Video (Reels) switch
-            HStack(spacing: 4) {
-                Button {
-                    isVideoMode = false
-                } label: {
-                    Text("FOTO")
-                        .font(.caption.bold())
-                        .foregroundStyle(!isVideoMode ? .black : .white)
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(!isVideoMode ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(Color.clear), in: Capsule())
-                        .contentShape(Capsule())
-                }
-                .buttonStyle(.plain)
+            // Compact Foto / Video (Reels) switch + 4K Video Quality Pill
+            HStack(spacing: 8) {
+                HStack(spacing: 4) {
+                    Button {
+                        isVideoMode = false
+                    } label: {
+                        Text("FOTO")
+                            .font(.caption.bold())
+                            .foregroundStyle(!isVideoMode ? .black : .white)
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(!isVideoMode ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(Color.clear), in: Capsule())
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
 
-                Button {
-                    isVideoMode = true
-                } label: {
-                    Text("VİDEO")
-                        .font(.caption.bold())
-                        .foregroundStyle(isVideoMode ? .white : .white.opacity(0.85))
-                        .padding(.horizontal, 14)
-                        .padding(.vertical, 7)
-                        .background(isVideoMode ? AnyShapeStyle(Color.red) : AnyShapeStyle(Color.clear), in: Capsule())
-                        .contentShape(Capsule())
+                    Button {
+                        isVideoMode = true
+                    } label: {
+                        Text("VİDEO")
+                            .font(.caption.bold())
+                            .foregroundStyle(isVideoMode ? .white : .white.opacity(0.85))
+                            .padding(.horizontal, 14)
+                            .padding(.vertical, 7)
+                            .background(isVideoMode ? AnyShapeStyle(Color.red) : AnyShapeStyle(Color.clear), in: Capsule())
+                            .contentShape(Capsule())
+                    }
+                    .buttonStyle(.plain)
                 }
-                .buttonStyle(.plain)
+                .padding(3)
+                .background(.ultraThinMaterial, in: Capsule())
+
+                if isVideoMode {
+                    Button {
+                        cameraService.configureCaptureMode(isVideo: true, is4K: !cameraService.is4KVideoEnabled)
+                    } label: {
+                        Text(cameraService.is4KVideoEnabled ? "4K" : "HD")
+                            .font(.caption2.bold())
+                            .foregroundStyle(cameraService.is4KVideoEnabled ? .black : .white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 7)
+                            .background(cameraService.is4KVideoEnabled ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
             }
-            .padding(3)
-            .background(.ultraThinMaterial, in: Capsule())
+            .onChange(of: isVideoMode) { _, video in
+                cameraService.configureCaptureMode(isVideo: video, is4K: cameraService.is4KVideoEnabled)
+            }
 
             HStack(spacing: 22) {
                 // Unlimited AI Poses Button
@@ -702,11 +806,19 @@ struct CameraView: View {
         let evBalanced = abs(ev) <= 0.6
 
         return VStack(spacing: 6) {
-            // Live Exposure Meter (-3 .. 0 .. +3)
+            // Live Exposure Meter (-3 .. 0 .. +3) + Overexposure Warning
             HStack(spacing: 6) {
                 Text("Pozometre")
                     .font(.caption2.bold())
                     .foregroundStyle(evBalanced ? .green : .yellow)
+                if visionService.guidance.lumaScore > 0.88 {
+                    Text("Aşırı Parlak")
+                        .font(.system(size: 9, weight: .bold))
+                        .padding(.horizontal, 5)
+                        .padding(.vertical, 2)
+                        .background(Color.red.opacity(0.85), in: Capsule())
+                        .foregroundStyle(.white)
+                }
                 Spacer()
                 HStack(spacing: 5) {
                     ForEach(-3...3, id: \.self) { tick in
@@ -764,6 +876,15 @@ struct CameraView: View {
                     }
                     .buttonStyle(.bordered)
                     .tint(.mint)
+
+                    if cameraService.isRAWSupported {
+                        Button("RAW") {
+                            cameraService.isRAWEnabled.toggle()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(cameraService.isRAWEnabled ? .yellow : .gray.opacity(0.4))
+                        .foregroundStyle(cameraService.isRAWEnabled ? .black : .white)
+                    }
                 }
                 .font(.caption2.bold())
             }
@@ -834,7 +955,13 @@ struct CameraView: View {
 
                 Button {
                     appState.isVoiceCoachEnabled.toggle()
-                    if !appState.isVoiceCoachEnabled { voiceCoach.stop() }
+                    if appState.isVoiceCoachEnabled {
+                        voiceCoach.speak("Sesli koç açık")
+                        showToast("Sesli koç açık")
+                    } else {
+                        voiceCoach.stop()
+                        showToast("Sesli koç kapalı")
+                    }
                 } label: {
                     Image(systemName: appState.isVoiceCoachEnabled ? "speaker.wave.2.fill" : "speaker.slash")
                         .font(.caption)
@@ -1039,7 +1166,8 @@ struct CameraView: View {
                         isGeneratedReference: false,
                         poseIdea: appState.pinnedPose,
                         zoomFactor: Double(cameraService.zoomFactor),
-                        overlayModeRaw: appState.overlayMode.rawValue
+                        overlayModeRaw: appState.overlayMode.rawValue,
+                        rollDegrees: horizonService.rollDegrees
                     )
                     if appState.autoSaveToApplePhotos, let latest = libraryStore.items.first {
                         _ = await libraryStore.saveToApplePhotos(latest)
@@ -1047,19 +1175,24 @@ struct CameraView: View {
                     showToast("En net kare (3'ten) kaydedildi")
                 }
             } else {
-                let image = try await cameraService.capturePhoto()
+                let (image, rawDNGData) = try await cameraService.capturePhotoWithRAW(preferRAW: isProMode)
                 let finalImage = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(image) : image
                 libraryStore.saveCapturedPhoto(
                     finalImage,
                     isGeneratedReference: false,
                     poseIdea: appState.pinnedPose,
                     zoomFactor: Double(cameraService.zoomFactor),
-                    overlayModeRaw: appState.overlayMode.rawValue
+                    overlayModeRaw: appState.overlayMode.rawValue,
+                    rollDegrees: horizonService.rollDegrees
                 )
+                var rawSaved = false
+                if let rawDNGData {
+                    rawSaved = await libraryStore.saveRAWToApplePhotos(rawDNGData)
+                }
                 if appState.autoSaveToApplePhotos, let latest = libraryStore.items.first {
                     _ = await libraryStore.saveToApplePhotos(latest)
                 }
-                showToast("Kütüphaneye kaydedildi")
+                showToast(rawSaved ? "RAW (DNG) + Fotoğraf kaydedildi" : "Kütüphaneye kaydedildi")
             }
         } catch {
             showToast("Çekim başarısız")
@@ -1101,14 +1234,21 @@ struct CameraView: View {
     }
 
     private func evaluateAutoShutter(with guidance: LiveGuidanceState) {
-        guard appState.isAutoShutterEnabled,
-              appState.pinnedPose != nil,
-              !isGeneratingPoses else { return }
+        guard !isGeneratingPoses, !isVideoMode else { return }
 
-        let isReady = guidance.lighting == .good
+        let poseReady = appState.isAutoShutterEnabled
+            && appState.pinnedPose != nil
+            && guidance.lighting == .good
             && guidance.framing == .great
             && !guidance.eyesClosed
             && (guidance.poseMatchScore ?? 0) >= 85
+
+        let smileReady = appState.isSmileShutterEnabled
+            && guidance.isGoodSmile
+            && !guidance.eyesClosed
+            && guidance.framing != .noSubject
+
+        let isReady = poseReady || smileReady
 
         if isReady && autoShutterTask == nil {
             let haptic = UIImpactFeedbackGenerator(style: .medium)
@@ -1133,7 +1273,8 @@ struct CameraView: View {
     }
 
     private func evaluateMatchHaptic(with guidance: LiveGuidanceState) {
-        guard appState.pinnedPose != nil,
+        guard appState.isHapticsEnabled,
+              appState.pinnedPose != nil,
               let score = guidance.poseMatchScore else {
             didVibrateForCurrentMatch = false
             return
@@ -1167,6 +1308,9 @@ struct CameraView: View {
             for remaining in stride(from: seconds, through: 1, by: -1) {
                 guard !Task.isCancelled else { return }
                 autoShutterCountdown = remaining
+                if remaining <= 3 {
+                    voiceCoach.speak("\(remaining)")
+                }
                 try? await Task.sleep(for: .seconds(1))
             }
             guard !Task.isCancelled else { return }
@@ -1177,6 +1321,20 @@ struct CameraView: View {
     }
 
     private func recordVideoClip() async {
+        recordingSeconds = 0
+        recordingTimerTask?.cancel()
+        recordingTimerTask = Task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(1))
+                guard !Task.isCancelled else { break }
+                recordingSeconds += 1
+            }
+        }
+        defer {
+            recordingTimerTask?.cancel()
+            recordingTimerTask = nil
+            recordingSeconds = 0
+        }
         do {
             let videoURL = try await cameraService.startVideoRecording()
             let saved = await libraryStore.saveVideoToApplePhotos(videoURL)

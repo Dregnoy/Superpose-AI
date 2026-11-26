@@ -30,6 +30,33 @@ struct ShotPacksView: View {
                     Text("Tüm poz önerileri, ilham aktarımı ve canlı kamera rehberliği tamamen ücretsiz ve sınırsızdır.")
                 }
 
+                Section("Kompozisyon Görevleri") {
+                    missionButton(
+                        title: "Çerçeveleme Dene",
+                        subtitle: "Kapı, kemer veya yapraklarla kenarları çerçevele",
+                        icon: "viewfinder",
+                        grid: .framing
+                    )
+                    missionButton(
+                        title: "1/3 Kuralı Portre",
+                        subtitle: "Özneyi çizgi kesişimine, bakış yönüne boşluk bırak",
+                        icon: "grid",
+                        grid: .ruleOfThirds
+                    )
+                    missionButton(
+                        title: "Simetri & Yansıma",
+                        subtitle: "Su birikintisi veya camda yere eğilip simetri yakala",
+                        icon: "square.split.2x2",
+                        grid: .symmetry
+                    )
+                    missionButton(
+                        title: "Köşegen / 3. Boyut",
+                        subtitle: "Mimariyi tam karşıdan değil köşeden derinlikle çek",
+                        icon: "line.diagonal",
+                        grid: .diagonal
+                    )
+                }
+
                 Section("Tercihler ve Yasal") {
                     Picker("Ana Odak", selection: Bindable(appState).preferredUseCase) {
                         ForEach(PoseUseCase.allCases) { useCase in
@@ -40,6 +67,9 @@ struct ShotPacksView: View {
                     Toggle("Çekilenleri Apple Fotoğraflar'a da Kaydet", isOn: Bindable(appState).autoSaveToApplePhotos)
                     Toggle("Otomatik Doğallaştır ve Netleştir", isOn: Bindable(appState).autoEnhancePhotos)
                     Toggle("Gece Çekimi Arayüzü (Kırmızı HUD)", isOn: Bindable(appState).isNightHudEnabled)
+                    Toggle("Poz Uyum Titreşimi", isOn: Bindable(appState).isHapticsEnabled)
+                    Toggle("Hızlı Sesli Koç", isOn: Bindable(appState).voiceCoachFast)
+                    Toggle("Gülümseyince Otomatik Çek", isOn: Bindable(appState).isSmileShutterEnabled)
 
                     Button {
                         showLegalSheet = true
@@ -69,6 +99,28 @@ struct ShotPacksView: View {
             .navigationTitle("Ayarlar")
             .sheet(isPresented: $showLegalSheet) {
                 PrivacyAndLegalView()
+            }
+        }
+    }
+
+    private func missionButton(title: String, subtitle: String, icon: String, grid: GridMode) -> some View {
+        Button {
+            appState.gridMode = grid
+            appState.pendingCameraTip = subtitle
+            appState.selectedTab = .camera
+        } label: {
+            Label {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title)
+                        .font(.subheadline.bold())
+                        .foregroundStyle(.primary)
+                    Text(subtitle)
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                }
+            } icon: {
+                Image(systemName: icon)
+                    .foregroundStyle(.cyan)
             }
         }
     }

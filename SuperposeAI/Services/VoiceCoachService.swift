@@ -10,7 +10,7 @@ final class VoiceCoachService {
     @ObservationIgnored private var lastSpokenTime: CFAbsoluteTime = 0
     @ObservationIgnored private let cooldown: CFAbsoluteTime = 4.0
 
-    func announceIfNeeded(_ guidance: LiveGuidanceState, isEnabled: Bool, hasPinnedPose: Bool) {
+    func announceIfNeeded(_ guidance: LiveGuidanceState, isEnabled: Bool, hasPinnedPose: Bool, fast: Bool = false) {
         guard isEnabled else { return }
 
         let now = CFAbsoluteTimeGetCurrent()
@@ -20,8 +20,14 @@ final class VoiceCoachService {
             if guidance.lighting == .tooDark {
                 return "Işık az, daha aydınlık bir yöne dön."
             }
-            if guidance.framing != .great && guidance.framing != .noSubject {
+            if guidance.framing == .noSubject {
+                return hasPinnedPose ? "Kadraja girin, poz bekleniyor." : nil
+            }
+            if guidance.framing != .great {
                 return localizedFraming(guidance.framing)
+            }
+            if let faceHint = guidance.faceAngleHint {
+                return faceHint
             }
             if hasPinnedPose, let score = guidance.poseMatchScore, score >= 85 {
                 return "Harika poz, sabit kal."
@@ -30,7 +36,7 @@ final class VoiceCoachService {
         }()
 
         guard let message, message != lastSpokenMessage else { return }
-        speak(message)
+        speak(message, fast: fast)
         lastSpokenMessage = message
         lastSpokenTime = now
     }
@@ -42,14 +48,14 @@ final class VoiceCoachService {
         speak(fullText)
     }
 
-    func speak(_ text: String) {
+    func speak(_ text: String, fast: Bool = false) {
         configureAudioSessionForSpeech()
         if synthesizer.isSpeaking {
             synthesizer.stopSpeaking(at: .immediate)
         }
         let utterance = AVSpeechUtterance(string: text)
-        utterance.rate = 0.50
-        utterance.voice = AVSpeechSynthesisVoice(language: "tr-TR")
+        utterance.rate = fast ? 0.56 : 0.50
+        utterance.voice = AVSpeechSynthesisVoice(language: "tr-TR") ?? AVSpeechSynthesisVoice()
         synthesizer.speak(utterance)
         isSpeaking = true
     }

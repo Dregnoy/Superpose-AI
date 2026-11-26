@@ -29,6 +29,8 @@ final class CameraService: NSObject {
     var lastError: CameraError?
     var isSessionRunning = false
     var isRecording = false
+    var isRAWEnabled = false
+    var isRAWSupported = false
 
     @ObservationIgnored nonisolated private let sessionQueue = DispatchQueue(label: "com.superposelabs.camera.session")
     @ObservationIgnored nonisolated private let videoQueue = DispatchQueue(label: "com.superposelabs.camera.video")
@@ -38,7 +40,10 @@ final class CameraService: NSObject {
     @ObservationIgnored nonisolated(unsafe) private var currentInput: AVCaptureDeviceInput?
     @ObservationIgnored nonisolated(unsafe) private var currentPosition: AVCaptureDevice.Position = .back
     @ObservationIgnored nonisolated(unsafe) private var currentFlashMode: AVCaptureDevice.FlashMode = .off
-    @ObservationIgnored private var photoContinuation: CheckedContinuation<UIImage, Error>?
+    @ObservationIgnored private var photoContinuation: CheckedContinuation<(UIImage, Data?), Error>?
+    @ObservationIgnored private var pendingProcessedImage: UIImage?
+    @ObservationIgnored private var pendingRawDNGData: Data?
+    @ObservationIgnored private var pendingPhotoError: Error?
     @ObservationIgnored private var videoContinuation: CheckedContinuation<URL, Error>?
 
     var onVideoFrame: ((CVPixelBuffer) -> Void)?
@@ -279,8 +284,39 @@ final class CameraService: NSObject {
             self.videoContinuation = continuation
             sessionQueue.async { [weak self] in
                 guard let self else { return }
+                if let conn = self.movieOutput.connection(with: .video),
+                   conn.isVideoStabilizationSupported {
+                    conn.preferredVideoStabilizationMode = .cinematic
+                }
                 self.movieOutput.startRecording(to: tempURL, recordingDelegate: self)
             }
+        }
+    }
+
+    var is4KVideoEnabled: Bool = false
+
+    func configureCaptureMode(isVideo: Bool, is4K: Bool) {
+        is4KVideoEnabled = is4K
+        sessionQueue.async { [weak self] in
+            guard let self else { return }
+            let targetPreset: AVCaptureSession.Preset
+            if isVideo {
+                if is4K && self.session.canSetSessionPreset(.hd4K3840x2160) {
+                    targetPreset = .hd4K3840x2160
+                } else if self.session.canSetSessionPreset(.hd1920x1080) {
+                    targetPreset = .hd1920x1080
+                } else {
+                    targetPreset = .high
+                }
+            } else {
+                targetPreset = .photo
+            }
+            guard self.session.sessionPreset != targetPreset else { return }
+            self.session.beginConfiguration()
+            if self.session.canSetSessionPreset(targetPreset) {
+                self.session.sessionPreset = targetPreset
+            }
+            self.session.commitConfiguration()
         }
     }
 
@@ -293,13 +329,30 @@ final class CameraService: NSObject {
     }
 
     func capturePhoto() async throws -> UIImage {
+        try await capturePhotoWithRAW(preferRAW: false).0
+    }
+
+    func capturePhotoWithRAW(preferRAW: Bool) async throws -> (UIImage, Data?) {
         let flash = flashMode
+        let wantRAW = preferRAW && isRAWEnabled
         currentFlashMode = flash
+        pendingProcessedImage = nil
+        pendingRawDNGData = nil
+        pendingPhotoError = nil
+
         return try await withCheckedThrowingContinuation { continuation in
             self.photoContinuation = continuation
             sessionQueue.async { [weak self] in
                 guard let self else { return }
-                let settings = AVCapturePhotoSettings()
+                let settings: AVCapturePhotoSettings
+                if wantRAW, let rawFormat = self.photoOutput.availableRawPhotoPixelFormatTypes.first {
+                    settings = AVCapturePhotoSettings(
+                        rawPixelFormatType: rawFormat,
+                        processedFormat: [AVVideoCodecKey: AVVideoCodecType.jpeg]
+                    )
+                } else {
+                    settings = AVCapturePhotoSettings()
+                }
                 if self.photoOutput.supportedFlashModes.contains(flash) {
                     settings.flashMode = flash
                 }
@@ -357,6 +410,11 @@ final class CameraService: NSObject {
         }
 
         session.commitConfiguration()
+        let rawSupported = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
+        Task { @MainActor [weak self] in
+            self?.isRAWSupported = rawSupported
+            if !rawSupported { self?.isRAWEnabled = false }
+        }
     }
 }
 
@@ -379,23 +437,44 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
         didFinishProcessingPhoto photo: AVCapturePhoto,
         error: Error?
     ) {
+        let isRaw = photo.isRawPhoto
         let data = photo.fileDataRepresentation()
         Task { @MainActor [weak self] in
             guard let self else { return }
             if let error {
-                self.photoContinuation?.resume(throwing: error)
-                self.photoContinuation = nil
+                self.pendingPhotoError = error
                 return
             }
+            if isRaw {
+                self.pendingRawDNGData = data
+            } else if let data, let image = UIImage(data: data) {
+                self.pendingProcessedImage = image
+            }
+        }
+    }
 
-            guard let data, let image = UIImage(data: data) else {
+    nonisolated func photoOutput(
+        _ output: AVCapturePhotoOutput,
+        didFinishCaptureFor resolvedSettings: AVCaptureResolvedPhotoSettings,
+        error: Error?
+    ) {
+        Task { @MainActor [weak self] in
+            guard let self else { return }
+            defer {
+                self.pendingProcessedImage = nil
+                self.pendingRawDNGData = nil
+                self.pendingPhotoError = nil
+                self.photoContinuation = nil
+            }
+            if let err = error ?? self.pendingPhotoError {
+                self.photoContinuation?.resume(throwing: err)
+                return
+            }
+            guard let image = self.pendingProcessedImage else {
                 self.photoContinuation?.resume(throwing: CameraError.captureFailed)
-                self.photoContinuation = nil
                 return
             }
-
-            self.photoContinuation?.resume(returning: image)
-            self.photoContinuation = nil
+            self.photoContinuation?.resume(returning: (image, self.pendingRawDNGData))
         }
     }
 }
