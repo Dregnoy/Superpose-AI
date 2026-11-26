@@ -1,0 +1,176 @@
+{
+  "sourceLanguage" : "en",
+  "strings" : {
+    "AI Poses (%lld)" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "AI Poz (%lld)" } }
+      }
+    },
+    "Available Shot Packs" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Mevcut Shot Pack" } }
+      }
+    },
+    "Camera" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kamera" } }
+      }
+    },
+    "Cancel" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İptal" } }
+      }
+    },
+    "Checking Light…" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Işık Ölçülüyor…" } }
+      }
+    },
+    "Close" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kapat" } }
+      }
+    },
+    "Coach" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Koç" } }
+      }
+    },
+    "Done" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Bitti" } }
+      }
+    },
+    "Flip" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çevir" } }
+      }
+    },
+    "For Photographer (Framing)" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Fotoğrafçı İçin (Kadraj)" } }
+      }
+    },
+    "For Subject (Posing)" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Poz Veren İçin (Duruş)" } }
+      }
+    },
+    "Good Lighting" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Işık İyi" } }
+      }
+    },
+    "Great Framing" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Harika Kadraj" } }
+      }
+    },
+    "Inspo" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İlham" } }
+      }
+    },
+    "Library" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kütüphane" } }
+      }
+    },
+    "Low Light — Face a Window" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Işık Az — Pencereye Dön" } }
+      }
+    },
+    "Match Pose" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Pozu Eşle" } }
+      }
+    },
+    "Move Closer" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Biraz Yaklaş" } }
+      }
+    },
+    "No Photos Yet" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Henüz Fotoğraf Yok" } }
+      }
+    },
+    "Pin" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Sabitle" } }
+      }
+    },
+    "Quick" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Hızlı Poz" } }
+      }
+    },
+    "Save" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydet" } }
+      }
+    },
+    "Saved!" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kaydedildi!" } }
+      }
+    },
+    "Select" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Seç" } }
+      }
+    },
+    "Share" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Paylaş" } }
+      }
+    },
+    "Shift Left" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Biraz Sola Kay" } }
+      }
+    },
+    "Shift Right" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Biraz Sağa Kay" } }
+      }
+    },
+    "Shot Packs" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Paketler" } }
+      }
+    },
+    "Start Shooting" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Çekime Başla" } }
+      }
+    },
+    "Step Back Slightly" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Biraz Geri Çekil" } }
+      }
+    },
+    "Step Into Frame" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Kadraja Gir" } }
+      }
+    },
+    "Strong Backlight — Turn Slightly" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "Ters Işık — Hafifçe Dön" } }
+      }
+    },
+    "What would you like help with first?" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "İlk olarak ne konuda yardım istersin?" } }
+      }
+    },
+    "Your 4 Pose Ideas" : {
+      "localizations" : {
+        "tr" : { "stringUnit" : { "state" : "translated", "value" : "4 Poz Önerin" } }
+      }
+    }
+  },
+  "version" : "1.0"
+}
