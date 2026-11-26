@@ -57,7 +57,7 @@ struct ShotPacksView: View {
                         Spacer()
                         Text(appState.geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? "Dahili Katalog" : "Anonim İskelet AI Aktif")
                             .font(.caption.bold())
-                            .foregroundStyle(appState.geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? .secondary : .green)
+                            .foregroundStyle(appState.geminiAPIKey.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ? Color.secondary : Color.green)
                     }
                 } header: {
                     Text("Gizlilik Korumalı AI")
