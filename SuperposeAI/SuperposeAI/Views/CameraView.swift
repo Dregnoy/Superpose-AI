@@ -246,7 +246,7 @@ struct CameraView: View {
                         .font(.caption2.bold())
                         .foregroundStyle(timerSeconds > 0 ? .black : .white)
                         .padding(.horizontal, timerSeconds > 0 ? 8 : 0)
-                        .frame(minWidth: 34, minheight: 34)
+                        .frame(minWidth: 34, minHeight: 34)
                         .background(timerSeconds > 0 ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
                     }
 
