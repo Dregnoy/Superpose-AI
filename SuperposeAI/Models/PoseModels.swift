@@ -62,6 +62,7 @@ enum AspectGuideMode: String, CaseIterable, Identifiable {
 enum GridMode: String, CaseIterable, Identifiable {
     case off = "Kapalı"
     case ruleOfThirds = "1/3"
+    case goldenRatio = "Altın Oran"
     case symmetry = "Simetri"
     case diagonal = "Köşegen"
     case framing = "Çerçeve"

@@ -319,6 +319,29 @@ struct CameraView: View {
             if isGeneratingPoses {
                 generatingOverlay
             }
+
+            if intervalTask != nil {
+                ZStack {
+                    Color.black.opacity(0.86)
+                        .ignoresSafeArea()
+                    VStack(spacing: 12) {
+                        Image(systemName: "repeat.circle.fill")
+                            .font(.system(size: 42))
+                            .foregroundStyle(.cyan)
+                        Text("Aralıklı Çekim • \(intervalShotsCount) kare")
+                            .font(.headline.monospacedDigit())
+                            .foregroundStyle(.white)
+                        Text("Pil tasarrufu için ekran karartıldı")
+                            .font(.caption)
+                            .foregroundStyle(.secondary)
+                        Button("Durdur") {
+                            toggleIntervalShooting()
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .tint(.red)
+                    }
+                }
+            }
         }
         .tint(appState.isNightHudEnabled ? Color(red: 0.95, green: 0.35, blue: 0.25) : .cyan)
         .task {
@@ -585,6 +608,18 @@ struct CameraView: View {
                                 .padding(.horizontal, 9)
                                 .padding(.vertical, 7)
                                 .background(.ultraThinMaterial, in: Capsule())
+                        }
+
+                        Button {
+                            appState.pickRandomPose()
+                            if let title = appState.pinnedPose?.title {
+                                showToast("Rastgele poz: \(title)")
+                            }
+                        } label: {
+                            Image(systemName: "die.face.5")
+                                .font(.caption.bold())
+                                .frame(width: 30, height: 30)
+                                .background(.ultraThinMaterial, in: Circle())
                         }
                     }
                 }
@@ -1632,6 +1667,18 @@ struct CompositionGridView: View {
                     hLine.move(to: CGPoint(x: 0, y: size.height * fraction))
                     hLine.addLine(to: CGPoint(x: size.width, y: size.height * fraction))
                     context.stroke(hLine, with: .color(lineColor), lineWidth: 0.75)
+                }
+            case .goldenRatio:
+                for fraction in [0.382, 0.618] {
+                    var vLine = Path()
+                    vLine.move(to: CGPoint(x: size.width * fraction, y: 0))
+                    vLine.addLine(to: CGPoint(x: size.width * fraction, y: size.height))
+                    context.stroke(vLine, with: .color(Color.yellow.opacity(0.35)), lineWidth: 0.8)
+
+                    var hLine = Path()
+                    hLine.move(to: CGPoint(x: 0, y: size.height * fraction))
+                    hLine.addLine(to: CGPoint(x: size.width, y: size.height * fraction))
+                    context.stroke(hLine, with: .color(Color.yellow.opacity(0.35)), lineWidth: 0.8)
                 }
             case .symmetry:
                 var vMid = Path()

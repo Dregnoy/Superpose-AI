@@ -533,8 +533,13 @@ struct ResultViewerSheet: View {
                     .padding(.horizontal)
                 }
 
-                // Minimal 3-tone selector + AI/CoreImage suggestion
+                // Minimal 3-tone selector + Shot Summary + AI/CoreImage suggestion
                 VStack(spacing: 6) {
+                    if let summary = shotSummaryText() {
+                        Text(summary)
+                            .font(.caption2)
+                            .foregroundStyle(.secondary)
+                    }
                     if let suggestion = recommendedTone(), suggestion != .original {
                         Text("Önerilen Ton: \(suggestion.rawValue)")
                             .font(.caption2.bold())
@@ -898,6 +903,20 @@ struct ResultViewerSheet: View {
         let context = CIContext()
         guard let resultCG = context.createCGImage(rotated, from: cropRect) else { return image }
         return UIImage(cgImage: resultCG, scale: image.scale, orientation: image.imageOrientation)
+    }
+
+    private func shotSummaryText() -> String? {
+        var parts: [String] = []
+        if let zoom = item.zoomFactor {
+            parts.append("\(Int(zoom.rounded()))x")
+        }
+        if let roll = item.rollDegrees {
+            parts.append(String(format: "Ufuk %.1f°", abs(roll)))
+        }
+        if let title = item.poseIdea?.title {
+            parts.append("Poz: \(title)")
+        }
+        return parts.isEmpty ? nil : parts.joined(separator: " • ")
     }
 
     private func recommendedTone() -> PhotoTone? {

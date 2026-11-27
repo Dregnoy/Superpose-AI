@@ -187,4 +187,14 @@ final class AppState {
             pinnedPose = pool.first
         }
     }
+
+    func pickRandomPose() {
+        let pool = savedCustomPoses + MockPoseCatalog.quickOfflinePoses
+        guard !pool.isEmpty else { return }
+        let candidates = pool.filter { $0.id != pinnedPose?.id }
+        if let chosen = (candidates.isEmpty ? pool : candidates).randomElement() {
+            pinnedPose = chosen
+            if overlayMode == .off { overlayMode = .fastSilhouette }
+        }
+    }
 }
