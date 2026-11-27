@@ -90,59 +90,65 @@ struct LibraryView: View {
 
                 if isMultiSelectMode && !selectedIDs.isEmpty {
                     ToolbarItem(placement: .bottomBar) {
-                        HStack {
-                            Button {
-                                let idsToSave = selectedIDs
-                                Task {
-                                    var savedCount = 0
-                                    for item in libraryStore.items where idsToSave.contains(item.id) {
-                                        if await libraryStore.saveToApplePhotos(item) {
-                                            savedCount += 1
+                        ScrollView(.horizontal, showsIndicators: false) {
+                            HStack(spacing: 14) {
+                                Button {
+                                    let idsToSave = selectedIDs
+                                    Task {
+                                        var savedCount = 0
+                                        for item in libraryStore.items where idsToSave.contains(item.id) {
+                                            if await libraryStore.saveToApplePhotos(item) {
+                                                savedCount += 1
+                                            }
                                         }
+                                        selectedIDs.removeAll()
+                                        isMultiSelectMode = false
+                                        poseExtractAlert = "\(savedCount) fotoğraf Apple Fotoğraflar'a kaydedildi."
                                     }
+                                } label: {
+                                    Label("Kaydet (\(selectedIDs.count))", systemImage: "square.and.arrow.down")
+                                }
+
+                                if selectedIDs.count >= 2 {
+                                    Button {
+                                        let idsToPick = selectedIDs
+                                        Task { await pickBestFavorite(from: idsToPick) }
+                                    } label: {
+                                        Label("En İyi", systemImage: "sparkles")
+                                    }
+                                }
+
+                                if selectedIDs.count == 2 || selectedIDs.count == 4 {
+                                    Button {
+                                        createCollage(from: selectedIDs)
+                                    } label: {
+                                        Label("Kolaj", systemImage: "square.grid.2x2")
+                                    }
+                                }
+
+                                if selectedIDs.count == 2 {
+                                    Button {
+                                        createDoubleExposure(from: selectedIDs)
+                                    } label: {
+                                        Label("Çift Poz", systemImage: "circle.lefthalf.filled")
+                                    }
+                                }
+
+                                Button {
+                                    createPDFAlbum(from: selectedIDs)
+                                } label: {
+                                    Label("PDF", systemImage: "doc.richtext")
+                                }
+
+                                Button(role: .destructive) {
+                                    libraryStore.deleteItems(ids: selectedIDs)
                                     selectedIDs.removeAll()
                                     isMultiSelectMode = false
-                                    poseExtractAlert = "\(savedCount) fotoğraf Apple Fotoğraflar'a kaydedildi."
-                                }
-                            } label: {
-                                Label("Kaydet (\(selectedIDs.count))", systemImage: "square.and.arrow.down")
-                            }
-
-                            if selectedIDs.count == 2 || selectedIDs.count == 4 {
-                                Spacer()
-                                Button {
-                                    createCollage(from: selectedIDs)
                                 } label: {
-                                    Label("Kolaj", systemImage: "square.grid.2x2")
+                                    Label("Sil (\(selectedIDs.count))", systemImage: "trash")
                                 }
                             }
-
-                            if selectedIDs.count == 2 {
-                                Spacer()
-                                Button {
-                                    createDoubleExposure(from: selectedIDs)
-                                } label: {
-                                    Label("Çift Poz", systemImage: "circle.lefthalf.filled")
-                                }
-                            }
-
-                            Spacer()
-
-                            Button {
-                                createPDFAlbum(from: selectedIDs)
-                            } label: {
-                                Label("PDF", systemImage: "doc.richtext")
-                            }
-
-                            Spacer()
-
-                            Button(role: .destructive) {
-                                libraryStore.deleteItems(ids: selectedIDs)
-                                selectedIDs.removeAll()
-                                isMultiSelectMode = false
-                            } label: {
-                                Label("Sil (\(selectedIDs.count))", systemImage: "trash")
-                            }
+                            .padding(.horizontal, 4)
                         }
                     }
                 }
@@ -382,6 +388,28 @@ struct LibraryView: View {
         selectedIDs.removeAll()
         isMultiSelectMode = false
         generatedPDFURL = outURL
+    }
+
+    @MainActor
+    private func pickBestFavorite(from ids: Set<UUID>) async {
+        let candidates = libraryStore.items
+            .filter { ids.contains($0.id) }
+            .compactMap { item in libraryStore.image(for: item).map { (item, $0) } }
+        guard candidates.count >= 2 else { return }
+
+        let vision = PoseVisionService()
+        guard let bestImage = await vision.pickBestShot(from: candidates.map(\.1)),
+              let winner = candidates.first(where: { $0.1 === bestImage })?.0 else {
+            return
+        }
+
+        if !winner.isFavorite {
+            libraryStore.toggleFavorite(id: winner.id)
+        }
+        selectedIDs.removeAll()
+        isMultiSelectMode = false
+        viewingItem = winner
+        poseExtractAlert = "En net ve en iyi yüz karesi favori olarak seçildi."
     }
 }
 
