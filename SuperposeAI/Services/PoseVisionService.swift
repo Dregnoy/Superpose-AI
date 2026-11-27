@@ -9,6 +9,7 @@ import Foundation
 @Observable
 final class PoseVisionService {
     var guidance = LiveGuidanceState()
+    var focusPeakingImage: UIImage? = nil
     var isPowerSavingActive: Bool {
         let lowBattery = UIDevice.current.batteryLevel >= 0 && UIDevice.current.batteryLevel <= 0.20
         return lowBattery || ProcessInfo.processInfo.isLowPowerModeEnabled
@@ -18,6 +19,7 @@ final class PoseVisionService {
     private var isProcessing = false
     private var lastProcessedTime: CFAbsoluteTime = 0
     @ObservationIgnored private var smileStreak: Int = 0
+    @ObservationIgnored nonisolated private let peakingContext = CIContext()
 
     /// Adapts frame analysis rate based on device thermal state, low power mode, and <20% battery.
     private var minimumInterval: CFAbsoluteTime {
@@ -30,12 +32,16 @@ final class PoseVisionService {
         }
     }
 
-    func analyzeFrame(_ pixelBuffer: CVPixelBuffer, targetPose: PoseIdea?) {
+    func analyzeFrame(_ pixelBuffer: CVPixelBuffer, targetPose: PoseIdea?, enableFocusPeaking: Bool = false) {
         let now = CFAbsoluteTimeGetCurrent()
-        let effectiveInterval = (targetPose == nil && guidance.framing == .noSubject)
+        let effectiveInterval = (targetPose == nil && guidance.framing == .noSubject && !enableFocusPeaking)
             ? max(minimumInterval, 0.25)
             : minimumInterval
         guard !isProcessing, now - lastProcessedTime >= effectiveInterval else { return }
+
+        if !enableFocusPeaking && focusPeakingImage != nil {
+            focusPeakingImage = nil
+        }
 
         isProcessing = true
         lastProcessedTime = now
@@ -100,10 +106,13 @@ final class PoseVisionService {
                 return primary
             }()
 
+            let peakingCG: CGImage? = enableFocusPeaking ? self.renderFocusPeakingMask(from: pixelBuffer) : nil
+
             Task { @MainActor [weak self] in
                 guard let self else { return }
                 self.smileStreak = rawSmile ? (self.smileStreak + 1) : 0
                 let isGoodSmile = self.smileStreak >= 3
+                self.focusPeakingImage = peakingCG.map { UIImage(cgImage: $0) }
                 self.guidance = LiveGuidanceState(
                     lighting: lighting,
                     framing: framing,
@@ -122,6 +131,28 @@ final class PoseVisionService {
                 self.isProcessing = false
             }
         }
+    }
+
+    nonisolated private func renderFocusPeakingMask(from pixelBuffer: CVPixelBuffer) -> CGImage? {
+        let scaled = CIImage(cvPixelBuffer: pixelBuffer)
+            .transformed(by: CGAffineTransform(scaleX: 0.35, y: 0.35))
+        guard let edges = CIFilter(name: "CIEdges") else { return nil }
+        edges.setValue(scaled, forKey: kCIInputImageKey)
+        edges.setValue(4.0, forKey: kCIInputIntensityKey)
+        guard let edgeOut = edges.outputImage else { return nil }
+
+        guard let contrast = CIFilter(name: "CIColorControls") else { return nil }
+        contrast.setValue(edgeOut, forKey: kCIInputImageKey)
+        contrast.setValue(2.0, forKey: kCIInputContrastKey)
+        contrast.setValue(-0.25, forKey: kCIInputBrightnessKey)
+        contrast.setValue(0.0, forKey: kCIInputSaturationKey)
+        guard let contrastOut = contrast.outputImage else { return nil }
+
+        guard let alphaMask = CIFilter(name: "CIMaskToAlpha") else { return nil }
+        alphaMask.setValue(contrastOut, forKey: kCIInputImageKey)
+        guard let finalCI = alphaMask.outputImage else { return nil }
+
+        return peakingContext.createCGImage(finalCI, from: scaled.extent)
     }
 
     // MARK: - On-Device Luma, Directional Light & Contrast Estimation

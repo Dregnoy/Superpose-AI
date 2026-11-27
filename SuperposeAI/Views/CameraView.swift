@@ -34,6 +34,7 @@ struct CameraView: View {
     @State private var recordingSeconds: Int = 0
     @State private var recordingTimerTask: Task<Void, Never>?
     @State private var isProMode: Bool = false
+    @State private var isFocusPeakingEnabled: Bool = false
     @State private var showToolsDrawer: Bool = false
     @State private var isFocusLocked: Bool = false
     @State private var focusPoint: CGPoint?
@@ -97,6 +98,19 @@ struct CameraView: View {
                 .ignoresSafeArea()
             } else {
                 cameraPermissionPlaceholder
+            }
+
+            // PRO Focus Peaking Overlay
+            if isProMode && isFocusPeakingEnabled && cameraService.cameraPosition == .back,
+               let peakingImage = visionService.focusPeakingImage {
+                Image(uiImage: peakingImage)
+                    .resizable()
+                    .renderingMode(.template)
+                    .foregroundStyle(.yellow)
+                    .scaledToFill()
+                    .ignoresSafeArea()
+                    .allowsHitTesting(false)
+                    .opacity(0.80)
             }
 
             // Focus Reticle + Visible Sun Exposure Track
@@ -329,7 +343,11 @@ struct CameraView: View {
             let granted = await cameraService.checkAndRequestPermission()
             if granted {
                 cameraService.onVideoFrame = { buffer in
-                    visionService.analyzeFrame(buffer, targetPose: appState.pinnedPose)
+                    visionService.analyzeFrame(
+                        buffer,
+                        targetPose: appState.pinnedPose,
+                        enableFocusPeaking: isProMode && isFocusPeakingEnabled && cameraService.cameraPosition == .back
+                    )
                 }
                 cameraService.startSession()
                 if let requestedZoom = appState.requestedZoomFactor {
@@ -752,7 +770,10 @@ struct CameraView: View {
                 if cameraService.cameraPosition == .back {
                     Button {
                         isProMode.toggle()
-                        if !isProMode { cameraService.resetProControls() }
+                        if !isProMode {
+                            isFocusPeakingEnabled = false
+                            cameraService.resetProControls()
+                        }
                     } label: {
                         Text("PRO")
                             .font(.caption2.bold())
@@ -1058,6 +1079,14 @@ struct CameraView: View {
                 Slider(value: $manualFocus, in: 0...1)
                     .tint(.yellow)
                     .onChange(of: manualFocus) { _, v in cameraService.setManualFocus(v) }
+                Button("Peak") {
+                    isFocusPeakingEnabled.toggle()
+                }
+                .font(.caption2.bold())
+                .padding(.horizontal, 7)
+                .padding(.vertical, 3)
+                .background(isFocusPeakingEnabled ? Color.yellow : Color.white.opacity(0.15), in: Capsule())
+                .foregroundStyle(isFocusPeakingEnabled ? .black : .white)
             }
             HStack(spacing: 10) {
                 Text("ISO")
