@@ -1,6 +1,7 @@
 import SwiftUI
 import AVFoundation
 import PhotosUI
+import AudioToolbox
 
 struct CameraView: View {
     @Environment(AppState.self) private var appState
@@ -1445,6 +1446,9 @@ struct CameraView: View {
         if score >= 85 && !didVibrateForCurrentMatch {
             didVibrateForCurrentMatch = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
+            if !appState.isSilentModeEnabled {
+                AudioServicesPlaySystemSound(1057)
+            }
         } else if score < 75 {
             didVibrateForCurrentMatch = false
         }

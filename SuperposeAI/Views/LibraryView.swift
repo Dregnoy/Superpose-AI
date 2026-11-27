@@ -22,6 +22,7 @@ struct LibraryView: View {
     @State private var pickedPhotoItem: PhotosPickerItem?
     @State private var isExtractingPose = false
     @State private var poseExtractAlert: String?
+    @State private var generatedPDFURL: URL?
 
     private let columns = [
         GridItem(.flexible(), spacing: 3),
@@ -127,6 +128,14 @@ struct LibraryView: View {
 
                             Spacer()
 
+                            Button {
+                                createPDFAlbum(from: selectedIDs)
+                            } label: {
+                                Label("PDF", systemImage: "doc.richtext")
+                            }
+
+                            Spacer()
+
                             Button(role: .destructive) {
                                 libraryStore.deleteItems(ids: selectedIDs)
                                 selectedIDs.removeAll()
@@ -174,6 +183,31 @@ struct LibraryView: View {
                 Button("Tamam", role: .cancel) {}
             } message: {
                 Text(poseExtractAlert ?? "")
+            }
+            .sheet(isPresented: Binding(
+                get: { generatedPDFURL != nil },
+                set: { if !$0 { generatedPDFURL = nil } }
+            )) {
+                if let pdfURL = generatedPDFURL {
+                    VStack(spacing: 18) {
+                        Image(systemName: "doc.richtext.fill")
+                            .font(.system(size: 44))
+                            .foregroundStyle(.cyan)
+                        Text("PDF Albüm Hazır")
+                            .font(.headline)
+                        ShareLink(item: pdfURL) {
+                            Label("PDF Albümü Paylaş / Kaydet", systemImage: "square.and.arrow.up")
+                                .font(.headline)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(Color.cyan, in: RoundedRectangle(cornerRadius: 12))
+                                .foregroundStyle(.black)
+                        }
+                        .padding(.horizontal)
+                    }
+                    .padding()
+                    .presentationDetents([.height(240)])
+                }
             }
         }
     }
@@ -304,6 +338,51 @@ struct LibraryView: View {
         isMultiSelectMode = false
         poseExtractAlert = "Çift pozlama fotoğrafı oluşturuldu."
     }
+
+    @MainActor
+    private func createPDFAlbum(from ids: Set<UUID>) {
+        let images = libraryStore.items
+            .filter { ids.contains($0.id) }
+            .compactMap { libraryStore.image(for: $0) }
+        guard !images.isEmpty else { return }
+
+        let pageRect = CGRect(x: 0, y: 0, width: 595, height: 842) // A4
+        let renderer = UIGraphicsPDFRenderer(bounds: pageRect)
+        let pdfData = renderer.pdfData { ctx in
+            for img in images {
+                ctx.beginPage()
+                UIColor.black.setFill()
+                ctx.fill(pageRect)
+
+                let margin: CGFloat = 32
+                let availW = pageRect.width - margin * 2
+                let availH = pageRect.height - margin * 2 - 28
+                let scale = min(availW / max(1, img.size.width), availH / max(1, img.size.height))
+                let drawW = img.size.width * scale
+                let drawH = img.size.height * scale
+                let drawRect = CGRect(
+                    x: (pageRect.width - drawW) / 2,
+                    y: margin + (availH - drawH) / 2,
+                    width: drawW,
+                    height: drawH
+                )
+                img.draw(in: drawRect)
+
+                let footer: NSString = "SuperposeAI Lookbook"
+                let attrs: [NSAttributedString.Key: Any] = [
+                    .font: UIFont.systemFont(ofSize: 11, weight: .semibold),
+                    .foregroundColor: UIColor.lightGray
+                ]
+                footer.draw(at: CGPoint(x: margin, y: pageRect.height - 28), withAttributes: attrs)
+            }
+        }
+
+        let outURL = FileManager.default.temporaryDirectory.appendingPathComponent("SuperposeAI_Album.pdf")
+        try? pdfData.write(to: outURL)
+        selectedIDs.removeAll()
+        isMultiSelectMode = false
+        generatedPDFURL = outURL
+    }
 }
 
 // MARK: - Result Viewer
@@ -336,6 +415,8 @@ struct ResultViewerSheet: View {
     @State private var selectedTone: PhotoTone = .original
     @State private var selectedCrop: CropRatio = .original
     @State private var isComparingOriginal = false
+    @State private var isSplitCompare = false
+    @State private var splitRatio: CGFloat = 0.5
     @State private var isPortraitBokeh = false
     @State private var bokehSigma: Double = 12.0
     @State private var bokehBaseImage: UIImage?
@@ -349,29 +430,79 @@ struct ResultViewerSheet: View {
     var body: some View {
         NavigationStack {
             VStack(spacing: 14) {
-                if let displayImage = isComparingOriginal ? libraryStore.image(for: item) : styledImage() {
-                    ZStack(alignment: .topLeading) {
-                        Image(uiImage: displayImage)
-                            .resizable()
-                            .scaledToFit()
-                            .clipShape(RoundedRectangle(cornerRadius: 16))
+                if let editedImage = styledImage(),
+                   let originalImage = libraryStore.image(for: item) {
+                    ZStack(alignment: .topTrailing) {
+                        if isSplitCompare {
+                            GeometryReader { geo in
+                                ZStack {
+                                    Image(uiImage: editedImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: geo.size.width, height: geo.size.height)
 
-                        if isComparingOriginal {
-                            Text("ORİJİNAL")
+                                    Image(uiImage: originalImage)
+                                        .resizable()
+                                        .scaledToFit()
+                                        .frame(width: geo.size.width, height: geo.size.height)
+                                        .mask(
+                                            HStack(spacing: 0) {
+                                                Rectangle().frame(width: geo.size.width * splitRatio)
+                                                Spacer(minLength: 0)
+                                            }
+                                        )
+
+                                    Rectangle()
+                                        .fill(Color.cyan)
+                                        .frame(width: 2)
+                                        .position(x: geo.size.width * splitRatio, y: geo.size.height / 2)
+                                }
+                                .clipShape(RoundedRectangle(cornerRadius: 16))
+                                .gesture(
+                                    DragGesture(minimumDistance: 0)
+                                        .onChanged { value in
+                                            splitRatio = max(0.08, min(0.92, value.location.x / max(1, geo.size.width)))
+                                        }
+                                )
+                            }
+                            .frame(maxHeight: 340)
+                        } else {
+                            ZStack(alignment: .topLeading) {
+                                Image(uiImage: isComparingOriginal ? originalImage : editedImage)
+                                    .resizable()
+                                    .scaledToFit()
+                                    .clipShape(RoundedRectangle(cornerRadius: 16))
+
+                                if isComparingOriginal {
+                                    Text("ORİJİNAL")
+                                        .font(.caption2.bold())
+                                        .padding(.horizontal, 8)
+                                        .padding(.vertical, 4)
+                                        .background(.black.opacity(0.7), in: Capsule())
+                                        .foregroundStyle(.white)
+                                        .padding(10)
+                                }
+                            }
+                            .gesture(
+                                DragGesture(minimumDistance: 0)
+                                    .onChanged { _ in isComparingOriginal = true }
+                                    .onEnded { _ in isComparingOriginal = false }
+                            )
+                        }
+
+                        Button {
+                            isSplitCompare.toggle()
+                        } label: {
+                            Label(isSplitCompare ? "Tek" : "Böl", systemImage: "rectangle.split.2x1")
                                 .font(.caption2.bold())
                                 .padding(.horizontal, 8)
-                                .padding(.vertical, 4)
-                                .background(.black.opacity(0.7), in: Capsule())
-                                .foregroundStyle(.white)
-                                .padding(10)
+                                .padding(.vertical, 5)
+                                .background(.black.opacity(0.65), in: Capsule())
+                                .foregroundStyle(isSplitCompare ? .cyan : .white)
                         }
+                        .padding(10)
                     }
                     .padding(.horizontal)
-                    .gesture(
-                        DragGesture(minimumDistance: 0)
-                            .onChanged { _ in isComparingOriginal = true }
-                            .onEnded { _ in isComparingOriginal = false }
-                    )
                 }
 
                 // Minimal 3-tone selector + AI/CoreImage suggestion
