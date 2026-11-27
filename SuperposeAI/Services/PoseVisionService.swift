@@ -31,7 +31,10 @@ final class PoseVisionService {
 
     func analyzeFrame(_ pixelBuffer: CVPixelBuffer, targetPose: PoseIdea?) {
         let now = CFAbsoluteTimeGetCurrent()
-        guard !isProcessing, now - lastProcessedTime >= minimumInterval else { return }
+        let effectiveInterval = (targetPose == nil && guidance.framing == .noSubject)
+            ? max(minimumInterval, 0.25)
+            : minimumInterval
+        guard !isProcessing, now - lastProcessedTime >= effectiveInterval else { return }
 
         isProcessing = true
         lastProcessedTime = now

@@ -29,6 +29,7 @@ struct CameraView: View {
     @State private var recordingSeconds: Int = 0
     @State private var recordingTimerTask: Task<Void, Never>?
     @State private var isProMode: Bool = false
+    @State private var showToolsDrawer: Bool = false
     @State private var isFocusLocked: Bool = false
     @State private var focusPoint: CGPoint?
     @State private var exposureBias: Float = 0.0
@@ -547,10 +548,31 @@ struct CameraView: View {
 
     // MARK: - Bottom Camera Controls (Fits Every iPhone Width)
 
+    private var isShotReady: Bool {
+        let g = visionService.guidance
+        guard g.lighting == .good, g.framing == .great, !g.eyesClosed else { return false }
+        if appState.pinnedPose != nil, (g.poseMatchScore ?? 0) < 85 {
+            return false
+        }
+        return true
+    }
+
+    private var hasActiveDrawerTools: Bool {
+        cameraService.flashMode == .on ||
+        appState.isVoiceCoachEnabled ||
+        appState.isAutoShutterEnabled ||
+        appState.gridMode != .off ||
+        timerSeconds > 0 ||
+        isBurstEnabled ||
+        voiceShutter.isListening ||
+        isProMode
+    }
+
     private var bottomControlsHUD: some View {
         VStack(spacing: 10) {
-            // Compact Tools Strip (scrollable so OTO / PRO never truncate to "...")
-            ScrollView(.horizontal, showsIndicators: false) {
+            if showToolsDrawer {
+                // Compact Tools Strip (scrollable so OTO / PRO never truncate to "...")
+                ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 8) {
                 Button {
                     cameraService.toggleFlash()
@@ -661,6 +683,7 @@ struct CameraView: View {
                 }
                 .padding(.horizontal, 2)
             }
+            }
 
             if isProMode && cameraService.cameraPosition == .back {
                 proControlsBar
@@ -687,8 +710,30 @@ struct CameraView: View {
                 }
             }
 
-            // Compact Foto / Video (Reels) switch + 4K Video Quality Pill
+            // Compact Tools Drawer Toggle + Foto / Video (Reels) switch + 4K Video Quality Pill
             HStack(spacing: 8) {
+                Button {
+                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                        showToolsDrawer.toggle()
+                    }
+                } label: {
+                    HStack(spacing: 4) {
+                        Image(systemName: showToolsDrawer ? "chevron.down" : "chevron.up")
+                        Text("Araçlar")
+                        if hasActiveDrawerTools && !showToolsDrawer {
+                            Circle()
+                                .fill(Color.cyan)
+                                .frame(width: 6, height: 6)
+                        }
+                    }
+                    .font(.caption2.bold())
+                    .foregroundStyle(showToolsDrawer ? .black : .white)
+                    .padding(.horizontal, 10)
+                    .padding(.vertical, 7)
+                    .background(showToolsDrawer ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                }
+                .buttonStyle(.plain)
+
                 HStack(spacing: 4) {
                     Button {
                         isVideoMode = false
@@ -774,7 +819,7 @@ struct CameraView: View {
                 } label: {
                     ZStack {
                         Circle()
-                            .stroke(autoShutterCountdown != nil ? Color.cyan : Color.white, lineWidth: 4)
+                            .stroke(autoShutterCountdown != nil ? Color.cyan : (isShotReady ? Color.green : Color.white), lineWidth: isShotReady ? 5 : 4)
                             .frame(width: 72, height: 72)
                         if isVideoMode {
                             RoundedRectangle(cornerRadius: cameraService.isRecording ? 8 : 29)
@@ -1091,7 +1136,7 @@ struct CameraView: View {
                 } label: {
                     ZStack {
                         Circle()
-                            .stroke(autoShutterCountdown != nil ? Color.cyan : Color.white, lineWidth: 4)
+                            .stroke(autoShutterCountdown != nil ? Color.cyan : (isShotReady ? Color.green : Color.white), lineWidth: isShotReady ? 5 : 4)
                             .frame(width: 66, height: 66)
                         if isVideoMode {
                             RoundedRectangle(cornerRadius: cameraService.isRecording ? 8 : 27)

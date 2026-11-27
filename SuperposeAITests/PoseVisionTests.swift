@@ -30,4 +30,30 @@ struct PoseVisionTests {
         #expect(store.consumeOnePack() == true)
         #expect(store.consumeOnePack() == true)
     }
+
+    @Test("GridMode includes framing guide and LibraryItem preserves rollDegrees")
+    func gridAndHorizonMetadata() {
+        #expect(GridMode.allCases.contains(.framing))
+        let item = LibraryItem(imageFilename: "test.jpg", isGeneratedReference: false, rollDegrees: 2.5)
+        #expect(item.rollDegrees == 2.5)
+    }
+
+    @Test("Couples pose swap exchanges primary and secondary skeletons")
+    @MainActor
+    func couplesSwap() {
+        let appState = AppState()
+        let first = PoseSkeleton(joints: [.nose: NormalizedPoint(x: 0.3, y: 0.3)])
+        let second = PoseSkeleton(joints: [.nose: NormalizedPoint(x: 0.7, y: 0.3)])
+        appState.pinnedPose = PoseIdea(
+            title: "Çift",
+            angleLabel: "Ön",
+            confidenceTag: "Test",
+            skeleton: first,
+            secondarySkeleton: second,
+            coaching: CoachingTips(summary: "Özet", subjectTips: [], photographerTips: [])
+        )
+        appState.swapCouplesPose()
+        #expect(appState.pinnedPose?.skeleton.joints[.nose]?.x == 0.7)
+        #expect(appState.pinnedPose?.secondarySkeleton?.joints[.nose]?.x == 0.3)
+    }
 }
