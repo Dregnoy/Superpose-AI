@@ -106,7 +106,7 @@ final class PoseVisionService {
                 return primary
             }()
 
-            let peakingCG: CGImage? = enableFocusPeaking ? self.renderFocusPeakingMask(from: pixelBuffer) : nil
+            let peakingCG: CGImage? = enableFocusPeaking ? self?.renderFocusPeakingMask(from: pixelBuffer) : nil
 
             Task { @MainActor [weak self] in
                 guard let self else { return }
