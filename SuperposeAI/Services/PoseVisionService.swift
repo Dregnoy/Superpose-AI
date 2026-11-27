@@ -19,7 +19,7 @@ final class PoseVisionService {
     private var isProcessing = false
     private var lastProcessedTime: CFAbsoluteTime = 0
     @ObservationIgnored private var smileStreak: Int = 0
-    @ObservationIgnored nonisolated private let peakingContext = CIContext()
+    @ObservationIgnored nonisolated private static let sharedCIContext = CIContext()
 
     /// Adapts frame analysis rate based on device thermal state, low power mode, and <20% battery.
     private var minimumInterval: CFAbsoluteTime {
@@ -58,16 +58,19 @@ final class PoseVisionService {
         let luma = metrics.average
 
         let isUpperBodyMode = (targetPose?.category == .cafe || targetPose?.category == .portrait)
+        let shouldDetectPose = (targetPose != nil)
 
         visionQueue.async { [weak self] in
-            let poseRequest = VNDetectHumanBodyPoseRequest()
             let rectRequest = VNDetectHumanRectanglesRequest()
             rectRequest.upperBodyOnly = isUpperBodyMode
             let faceRequest = VNDetectFaceLandmarksRequest()
+            let poseRequest = shouldDetectPose ? VNDetectHumanBodyPoseRequest() : nil
 
             let handler = VNImageRequestHandler(cvPixelBuffer: pixelBuffer, orientation: .up, options: [:])
             do {
-                try handler.perform([poseRequest, rectRequest, faceRequest])
+                var requests: [VNRequest] = [rectRequest, faceRequest]
+                if let poseRequest { requests.append(poseRequest) }
+                try handler.perform(requests)
             } catch {
                 Task { @MainActor [weak self] in
                     self?.isProcessing = false
@@ -75,7 +78,7 @@ final class PoseVisionService {
                 return
             }
 
-            let detectedAll = (poseRequest.results ?? []).prefix(2).compactMap { Self.extractSkeleton(from: $0) }
+            let detectedAll = (poseRequest?.results ?? []).prefix(2).compactMap { Self.extractSkeleton(from: $0) }
             let detectedSkeleton = detectedAll.first
             let detectedSecondary = detectedAll.count > 1 ? detectedAll[1] : nil
             let framing = Self.evaluateFraming(
@@ -152,7 +155,7 @@ final class PoseVisionService {
         alphaMask.setValue(contrastOut, forKey: kCIInputImageKey)
         guard let finalCI = alphaMask.outputImage else { return nil }
 
-        return peakingContext.createCGImage(finalCI, from: scaled.extent)
+        return Self.sharedCIContext.createCGImage(finalCI, from: scaled.extent)
     }
 
     // MARK: - On-Device Luma, Directional Light & Contrast Estimation
@@ -511,7 +514,7 @@ final class PoseVisionService {
                         return
                     }
 
-                    let ciContext = CIContext()
+                    let ciContext = Self.sharedCIContext
                     let originalCI = CIImage(cgImage: cgImage)
                     let maskCI = CIImage(cvPixelBuffer: maskBuffer)
 
@@ -611,7 +614,7 @@ final class PoseVisionService {
                         return
                     }
 
-                    let ciContext = CIContext()
+                    let ciContext = Self.sharedCIContext
                     let originalCI = CIImage(cgImage: cgImage)
                     let maskCI = CIImage(cvPixelBuffer: maskBuffer)
                     let scaleX = originalCI.extent.width / maskCI.extent.width

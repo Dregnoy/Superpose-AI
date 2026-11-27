@@ -29,7 +29,7 @@ final class AppState {
 
     var geminiAPIKey: String {
         didSet {
-            UserDefaults.standard.set(geminiAPIKey, forKey: "geminiAPIKey")
+            KeychainHelper.saveAPIKey(geminiAPIKey)
         }
     }
 
@@ -116,7 +116,7 @@ final class AppState {
         self.isSmileShutterEnabled = UserDefaults.standard.bool(forKey: "isSmileShutterEnabled")
         self.isSilentModeEnabled = UserDefaults.standard.bool(forKey: "isSilentModeEnabled")
         self.isOneHandedMode = UserDefaults.standard.bool(forKey: "isOneHandedMode")
-        self.geminiAPIKey = UserDefaults.standard.string(forKey: "geminiAPIKey") ?? ""
+        self.geminiAPIKey = KeychainHelper.loadAPIKey()
         if let data = UserDefaults.standard.data(forKey: "savedCustomPoses"),
            let decoded = try? JSONDecoder().decode([PoseIdea].self, from: data) {
             self.savedCustomPoses = decoded

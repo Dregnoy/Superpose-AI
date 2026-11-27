@@ -46,7 +46,7 @@ struct AIPoseGeneratorService: PoseGenerating {
         useCase: PoseUseCase,
         apiKey: String
     ) async throws -> [PoseIdea] {
-        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=\(apiKey)") else {
+        guard let url = URL(string: "https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent") else {
             return []
         }
 
@@ -84,6 +84,7 @@ struct AIPoseGeneratorService: PoseGenerating {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.setValue(apiKey, forHTTPHeaderField: "x-goog-api-key")
         request.httpBody = try JSONSerialization.data(withJSONObject: body)
 
         let (data, response) = try await URLSession.shared.data(for: request)

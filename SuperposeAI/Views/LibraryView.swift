@@ -24,6 +24,8 @@ struct LibraryView: View {
     @State private var poseExtractAlert: String?
     @State private var generatedPDFURL: URL?
 
+    private static let sharedCIContext = CIContext()
+
     private let columns = [
         GridItem(.flexible(), spacing: 3),
         GridItem(.flexible(), spacing: 3),
@@ -334,7 +336,7 @@ struct LibraryView: View {
         blend?.setValue(topScaled, forKey: kCIInputImageKey)
         blend?.setValue(baseCI, forKey: kCIInputBackgroundImageKey)
 
-        let context = CIContext()
+        let context = Self.sharedCIContext
         guard let output = blend?.outputImage,
               let resultCG = context.createCGImage(output, from: baseCI.extent) else { return }
 
@@ -454,6 +456,8 @@ struct ResultViewerSheet: View {
     @State private var exposureAdjust: Double = 0.0
     @State private var warmthAdjust: Double = 0.0
     @State private var enhancedCache: UIImage?
+
+    private static let sharedCIContext = CIContext()
 
     var body: some View {
         NavigationStack {
@@ -777,7 +781,7 @@ struct ResultViewerSheet: View {
         }
 
         let ciImage = CIImage(cgImage: cgImage)
-        let context = CIContext()
+        let context = Self.sharedCIContext
         var currentCI: CIImage = ciImage
 
         switch selectedTone {
@@ -900,7 +904,7 @@ struct ResultViewerSheet: View {
             width: safeW,
             height: safeH
         )
-        let context = CIContext()
+        let context = Self.sharedCIContext
         guard let resultCG = context.createCGImage(rotated, from: cropRect) else { return image }
         return UIImage(cgImage: resultCG, scale: image.scale, orientation: image.imageOrientation)
     }

@@ -1,4 +1,5 @@
 import Testing
+import UIKit
 @testable import SuperposeAI
 
 @Suite("Pose Matching & Unlimited Shot Pack Tests")
@@ -55,5 +56,50 @@ struct PoseVisionTests {
         appState.swapCouplesPose()
         #expect(appState.pinnedPose?.skeleton.joints[.nose]?.x == 0.7)
         #expect(appState.pinnedPose?.secondarySkeleton?.joints[.nose]?.x == 0.3)
+    }
+
+    @Test("AIPoseGeneratorService offline fallback returns 4 valid poses")
+    func offlinePoseGeneration() async throws {
+        let service = AIPoseGeneratorService()
+        let poses = try await service.generatePoses(
+            skeleton: nil,
+            sceneTags: ["street"],
+            lighting: .good,
+            useCase: .travel,
+            apiKey: ""
+        )
+        #expect(poses.count == 4)
+    }
+
+    @Test("PhotoEnhancerService preserves image dimensions")
+    func photoEnhancerDimensions() {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64))
+        let sample = renderer.image { ctx in
+            UIColor.gray.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+        }
+        let enhanced = PhotoEnhancerService.naturalizeAndSharpen(sample)
+        #expect(enhanced.size.width == 64)
+        #expect(enhanced.size.height == 64)
+    }
+
+    @Test("LibraryStore save, toggleFavorite, and delete lifecycle")
+    @MainActor
+    func libraryLifecycle() {
+        let store = LibraryStore()
+        let initialCount = store.items.count
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 32, height: 32))
+        let img = renderer.image { ctx in
+            UIColor.cyan.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 32, height: 32))
+        }
+        store.saveCapturedPhoto(img)
+        #expect(store.items.count == initialCount + 1)
+        if let created = store.items.first {
+            store.toggleFavorite(id: created.id)
+            #expect(store.items.first?.isFavorite == true)
+            store.deleteItems(ids: [created.id])
+            #expect(store.items.count == initialCount)
+        }
     }
 }
