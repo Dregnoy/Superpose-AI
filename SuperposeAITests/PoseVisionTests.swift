@@ -61,8 +61,8 @@ struct PoseVisionTests {
     @Test("AIPoseGeneratorService offline fallback returns 4 valid poses")
     func offlinePoseGeneration() async throws {
         let service = AIPoseGeneratorService()
-        let poses = try await service.generatePoses(
-            skeleton: nil,
+        let poses = try await service.generatePosePack(
+            from: nil,
             sceneTags: ["street"],
             lighting: .good,
             useCase: .travel,
