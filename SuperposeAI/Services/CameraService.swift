@@ -42,6 +42,8 @@ final class CameraService: NSObject {
     @ObservationIgnored nonisolated(unsafe) private var currentFlashMode: AVCaptureDevice.FlashMode = .off
     @ObservationIgnored nonisolated(unsafe) private var isFocusLockedByUser: Bool = false
     @ObservationIgnored nonisolated(unsafe) private var subjectAreaObserver: NSObjectProtocol?
+    @ObservationIgnored private var lastFaceFocusTime: CFAbsoluteTime = 0
+    @ObservationIgnored private var lastFaceFocusCenter: CGPoint = .zero
     @ObservationIgnored private var photoContinuation: CheckedContinuation<(UIImage, Data?), Error>?
     @ObservationIgnored private var pendingProcessedImage: UIImage?
     @ObservationIgnored private var pendingRawDNGData: Data?
@@ -163,6 +165,42 @@ final class CameraService: NSObject {
             device.unlockForConfiguration()
         } catch {
             // Ignore if device is busy
+        }
+    }
+
+    func trackFaceFocusIfUnlocked(normalizedFaceBox: CGRect, isProMode: Bool) {
+        guard !isProMode, !isFocusLockedByUser else { return }
+        let now = CFAbsoluteTimeGetCurrent()
+        guard now - lastFaceFocusTime >= 0.8 else { return }
+
+        let center = CGPoint(x: normalizedFaceBox.midX, y: normalizedFaceBox.midY)
+        guard hypot(center.x - lastFaceFocusCenter.x, center.y - lastFaceFocusCenter.y) >= 0.06 else { return }
+
+        lastFaceFocusTime = now
+        lastFaceFocusCenter = center
+        let devicePoint = CGPoint(
+            x: max(0.0, min(1.0, center.y)),
+            y: max(0.0, min(1.0, cameraPosition == .front ? center.x : (1.0 - center.x)))
+        )
+
+        sessionQueue.async { [weak self] in
+            guard let self, !self.isFocusLockedByUser, let device = self.currentInput?.device else { return }
+            do {
+                try device.lockForConfiguration()
+                if device.isFocusPointOfInterestSupported {
+                    device.focusPointOfInterest = devicePoint
+                    if device.isFocusModeSupported(.continuousAutoFocus) {
+                        device.focusMode = .continuousAutoFocus
+                    }
+                }
+                if device.isExposurePointOfInterestSupported {
+                    device.exposurePointOfInterest = devicePoint
+                    if device.isExposureModeSupported(.continuousAutoExposure) {
+                        device.exposureMode = .continuousAutoExposure
+                    }
+                }
+                device.unlockForConfiguration()
+            } catch {}
         }
     }
 

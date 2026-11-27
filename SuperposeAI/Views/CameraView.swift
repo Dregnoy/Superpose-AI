@@ -349,6 +349,9 @@ struct CameraView: View {
                 didShowHazeHint = true
                 showToast("Görüntü puslu görünüyor — lensi kontrol edin")
             }
+            if let faceBox = newGuidance.detectedFaceBox {
+                cameraService.trackFaceFocusIfUnlocked(normalizedFaceBox: faceBox, isProMode: isProMode)
+            }
             evaluateAutoShutter(with: newGuidance)
             evaluateMatchHaptic(with: newGuidance)
         }
