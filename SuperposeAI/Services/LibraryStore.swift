@@ -24,14 +24,16 @@ final class LibraryStore {
         load()
     }
 
+    @discardableResult
     func saveCapturedPhoto(
         _ image: UIImage,
         isGeneratedReference: Bool = false,
         poseIdea: PoseIdea? = nil,
         zoomFactor: Double? = nil,
         overlayModeRaw: String? = nil,
-        rollDegrees: Double? = nil
-    ) {
+        rollDegrees: Double? = nil,
+        qualityScore: Double? = nil
+    ) -> UUID {
         let filename = "\(UUID().uuidString).jpg"
         let fileURL = libraryDirectory.appendingPathComponent(filename)
         if let data = image.jpegData(compressionQuality: 0.9) {
@@ -44,9 +46,17 @@ final class LibraryStore {
             poseIdea: poseIdea,
             zoomFactor: zoomFactor,
             overlayModeRaw: overlayModeRaw,
-            rollDegrees: rollDegrees
+            rollDegrees: rollDegrees,
+            qualityScore: qualityScore
         )
         items.insert(item, at: 0)
+        persist()
+        return item.id
+    }
+
+    func updateQualityScore(id: UUID, score: Double) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        items[idx].qualityScore = score
         persist()
     }
 

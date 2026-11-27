@@ -93,13 +93,42 @@ struct PoseVisionTests {
             UIColor.cyan.setFill()
             ctx.fill(CGRect(x: 0, y: 0, width: 32, height: 32))
         }
-        store.saveCapturedPhoto(img)
+        let savedID = store.saveCapturedPhoto(img)
         #expect(store.items.count == initialCount + 1)
+        store.updateQualityScore(id: savedID, score: 88.5)
+        #expect(store.items.first(where: { $0.id == savedID })?.qualityScore == 88.5)
         if let created = store.items.first {
             store.toggleFavorite(id: created.id)
             #expect(store.items.first?.isFavorite == true)
             store.deleteItems(ids: [created.id])
             #expect(store.items.count == initialCount)
         }
+    }
+
+    @Test("PoseVisionService sharpness score distinguishes flat and detailed images")
+    func sharpnessScoring() throws {
+        let flatRenderer = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64))
+        let flatImg = flatRenderer.image { ctx in
+            UIColor.gray.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+        }
+        let sharpImg = flatRenderer.image { ctx in
+            UIColor.black.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+            UIColor.white.setFill()
+            for y in stride(from: 0, to: 64, by: 8) {
+                for x in stride(from: 0, to: 64, by: 8) {
+                    if ((x + y) / 8) % 2 == 0 {
+                        ctx.fill(CGRect(x: x, y: y, width: 8, height: 8))
+                    }
+                }
+            }
+        }
+        let flatCG = try #require(flatImg.cgImage)
+        let sharpCG = try #require(sharpImg.cgImage)
+        let flatScore = PoseVisionService.computeSharpnessScore(cgImage: flatCG)
+        let sharpScore = PoseVisionService.computeSharpnessScore(cgImage: sharpCG)
+        #expect(flatScore >= 0.0 && flatScore <= 1.0)
+        #expect(sharpScore > flatScore)
     }
 }

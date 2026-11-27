@@ -1390,16 +1390,21 @@ struct CameraView: View {
                         try? await Task.sleep(for: .milliseconds(160))
                     }
                 }
-                if let best = await visionService.pickBestShot(from: burstFrames) {
+                if let best = await visionService.pickBestShot(from: burstFrames, targetPose: appState.pinnedPose) {
                     let finalBest = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(best) : best
-                    libraryStore.saveCapturedPhoto(
+                    let pinned = appState.pinnedPose
+                    let savedID = libraryStore.saveCapturedPhoto(
                         finalBest,
                         isGeneratedReference: false,
-                        poseIdea: appState.pinnedPose,
+                        poseIdea: pinned,
                         zoomFactor: Double(cameraService.zoomFactor),
                         overlayModeRaw: appState.overlayMode.rawValue,
                         rollDegrees: horizonService.rollDegrees
                     )
+                    Task {
+                        let quality = await visionService.evaluateShotQuality(image: finalBest, targetPose: pinned)
+                        libraryStore.updateQualityScore(id: savedID, score: quality.totalScore)
+                    }
                     if appState.autoSaveToApplePhotos, let latest = libraryStore.items.first {
                         _ = await libraryStore.saveToApplePhotos(latest)
                     }
@@ -1408,14 +1413,19 @@ struct CameraView: View {
             } else {
                 let (image, rawDNGData) = try await cameraService.capturePhotoWithRAW(preferRAW: isProMode)
                 let finalImage = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(image) : image
-                libraryStore.saveCapturedPhoto(
+                let pinned = appState.pinnedPose
+                let savedID = libraryStore.saveCapturedPhoto(
                     finalImage,
                     isGeneratedReference: false,
-                    poseIdea: appState.pinnedPose,
+                    poseIdea: pinned,
                     zoomFactor: Double(cameraService.zoomFactor),
                     overlayModeRaw: appState.overlayMode.rawValue,
                     rollDegrees: horizonService.rollDegrees
                 )
+                Task {
+                    let quality = await visionService.evaluateShotQuality(image: finalImage, targetPose: pinned)
+                    libraryStore.updateQualityScore(id: savedID, score: quality.totalScore)
+                }
                 var rawSaved = false
                 if let rawDNGData {
                     rawSaved = await libraryStore.saveRAWToApplePhotos(rawDNGData)
@@ -1532,10 +1542,13 @@ struct CameraView: View {
             return
         }
         let mask = await visionService.extractPersonSilhouette(from: uiImage)
+        if !appState.isPoseSaved(extracted) {
+            appState.toggleSavePose(extracted)
+        }
         appState.pinPoseAndSwitchToCamera(extracted)
         appState.pinnedGhostMask = mask
         if mask != nil { appState.overlayMode = .ghost }
-        showToast("İlham pozu sabitlendi!")
+        showToast("İlham pozu (\(extracted.angleLabel)) sabitlendi!")
     }
 
     private func startManualTimerCapture(seconds: Int) {

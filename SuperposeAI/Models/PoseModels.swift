@@ -262,6 +262,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
     let overlayModeRaw: String?
     let rollDegrees: Double?
     var isFavorite: Bool
+    var qualityScore: Double?
     let createdAt: Date
 
     init(
@@ -273,6 +274,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
         overlayModeRaw: String? = nil,
         rollDegrees: Double? = nil,
         isFavorite: Bool = false,
+        qualityScore: Double? = nil,
         createdAt: Date = .now
     ) {
         self.id = id
@@ -283,6 +285,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
         self.overlayModeRaw = overlayModeRaw
         self.rollDegrees = rollDegrees
         self.isFavorite = isFavorite
+        self.qualityScore = qualityScore
         self.createdAt = createdAt
     }
 
@@ -296,6 +299,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
         self.overlayModeRaw = try c.decodeIfPresent(String.self, forKey: .overlayModeRaw)
         self.rollDegrees = try c.decodeIfPresent(Double.self, forKey: .rollDegrees)
         self.isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        self.qualityScore = try c.decodeIfPresent(Double.self, forKey: .qualityScore)
         self.createdAt = try c.decode(Date.self, forKey: .createdAt)
     }
 }

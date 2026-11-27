@@ -249,6 +249,30 @@ struct LibraryView: View {
                     .padding(6)
                     .shadow(radius: 2)
             }
+
+            if let score = item.qualityScore {
+                VStack {
+                    Spacer()
+                    HStack {
+                        HStack(spacing: 3) {
+                            if score >= 75 {
+                                Image(systemName: "sparkles")
+                                    .font(.system(size: 9, weight: .bold))
+                            }
+                            Text(score >= 75 ? "En İyi %\(Int(score.rounded()))" : "%\(Int(score.rounded()))")
+                                .font(.system(size: 10, weight: .semibold, design: .rounded))
+                        }
+                        .padding(.horizontal, 6)
+                        .padding(.vertical, 3)
+                        .background(
+                            Capsule().fill(score >= 75 ? Color.yellow.opacity(0.92) : Color.black.opacity(0.65))
+                        )
+                        .foregroundStyle(score >= 75 ? .black : .white)
+                        .padding(5)
+                        Spacer()
+                    }
+                }
+            }
         }
         .contentShape(Rectangle())
         .onTapGesture {
@@ -400,18 +424,23 @@ struct LibraryView: View {
         guard candidates.count >= 2 else { return }
 
         let vision = PoseVisionService()
-        guard let bestImage = await vision.pickBestShot(from: candidates.map(\.1)),
-              let winner = candidates.first(where: { $0.1 === bestImage })?.0 else {
-            return
+        var scored: [(LibraryItem, Double)] = []
+        for (item, image) in candidates {
+            let breakdown = await vision.evaluateShotQuality(image: image, targetPose: item.poseIdea)
+            libraryStore.updateQualityScore(id: item.id, score: breakdown.totalScore)
+            scored.append((item, breakdown.totalScore))
         }
+
+        guard let best = scored.max(by: { $0.1 < $1.1 }) else { return }
+        let winner = best.0
 
         if !winner.isFavorite {
             libraryStore.toggleFavorite(id: winner.id)
         }
         selectedIDs.removeAll()
         isMultiSelectMode = false
-        viewingItem = winner
-        poseExtractAlert = "En net ve en iyi yüz karesi favori olarak seçildi."
+        viewingItem = libraryStore.items.first(where: { $0.id == winner.id }) ?? winner
+        poseExtractAlert = "En net, keskin ve uyumlu kare favori olarak seçildi (Skor: %\(Int(best.1.rounded())))."
     }
 }
 
