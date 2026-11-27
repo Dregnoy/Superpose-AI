@@ -1,10 +1,16 @@
 import CoreImage
+import Metal
 import UIKit
 
 /// Applies subtle, natural on-device shadow/highlight recovery, vibrance,
 /// and luminance sharpening using CoreImage—zero cloud upload.
 enum PhotoEnhancerService {
-    private static let context = CIContext()
+    static let context: CIContext = {
+        if let device = MTLCreateSystemDefaultDevice() {
+            return CIContext(mtlDevice: device)
+        }
+        return CIContext()
+    }()
 
     static func naturalizeAndSharpen(_ image: UIImage) -> UIImage {
         guard let cgImage = image.cgImage else { return image }

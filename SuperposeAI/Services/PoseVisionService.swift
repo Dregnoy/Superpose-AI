@@ -1,5 +1,6 @@
 import Vision
 import CoreImage
+import Metal
 import UIKit
 import Foundation
 
@@ -19,7 +20,12 @@ final class PoseVisionService {
     private var isProcessing = false
     private var lastProcessedTime: CFAbsoluteTime = 0
     @ObservationIgnored private var smileStreak: Int = 0
-    @ObservationIgnored nonisolated private static let sharedCIContext = CIContext()
+    @ObservationIgnored nonisolated private static let sharedCIContext: CIContext = {
+        if let device = MTLCreateSystemDefaultDevice() {
+            return CIContext(mtlDevice: device)
+        }
+        return CIContext()
+    }()
 
     /// Adapts frame analysis rate based on device thermal state, low power mode, and <20% battery.
     private var minimumInterval: CFAbsoluteTime {

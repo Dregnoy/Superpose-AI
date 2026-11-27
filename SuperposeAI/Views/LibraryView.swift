@@ -24,7 +24,7 @@ struct LibraryView: View {
     @State private var poseExtractAlert: String?
     @State private var generatedPDFURL: URL?
 
-    private static let sharedCIContext = CIContext()
+    private static let sharedCIContext = PhotoEnhancerService.context
 
     private let columns = [
         GridItem(.flexible(), spacing: 3),
@@ -457,7 +457,7 @@ struct ResultViewerSheet: View {
     @State private var warmthAdjust: Double = 0.0
     @State private var enhancedCache: UIImage?
 
-    private static let sharedCIContext = CIContext()
+    private static let sharedCIContext = PhotoEnhancerService.context
 
     var body: some View {
         NavigationStack {
@@ -717,6 +717,11 @@ struct ResultViewerSheet: View {
                         Button("Bitti") { dismiss() }
                     }
                 }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+                enhancedCache = nil
+                bokehBaseImage = nil
+                isApplyingBokeh = false
             }
         }
     }

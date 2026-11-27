@@ -423,6 +423,9 @@ struct CameraView: View {
                 cameraService.updateOrientation(to: scene.interfaceOrientation)
             }
         }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
+            visionService.focusPeakingImage = nil
+        }
         .sheet(item: $previewingLatestItem) { item in
             ResultViewerSheet(item: item)
         }
