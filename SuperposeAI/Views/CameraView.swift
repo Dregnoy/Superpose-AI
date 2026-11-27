@@ -22,6 +22,7 @@ struct CameraView: View {
     @State private var toastMessage: String?
     @State private var autoShutterCountdown: Int?
     @State private var autoShutterTask: Task<Void, Never>?
+    @State private var lastAutoShotTime: CFAbsoluteTime = 0
     @State private var selectedInspoItem: PhotosPickerItem?
     @State private var timerSeconds: Int = 0 // 0, 3, or 10
     @State private var isBurstEnabled: Bool = false
@@ -1353,8 +1354,9 @@ struct CameraView: View {
             && guidance.framing != .noSubject
 
         let isReady = poseReady || smileReady
+        let cooledDown = (CFAbsoluteTimeGetCurrent() - lastAutoShotTime) >= 5.0
 
-        if isReady && autoShutterTask == nil {
+        if isReady && cooledDown && autoShutterTask == nil {
             let haptic = UIImpactFeedbackGenerator(style: .medium)
             haptic.impactOccurred()
 
@@ -1367,6 +1369,7 @@ struct CameraView: View {
                 guard !Task.isCancelled else { return }
                 autoShutterCountdown = nil
                 autoShutterTask = nil
+                lastAutoShotTime = CFAbsoluteTimeGetCurrent()
                 await captureAndSavePhoto()
             }
         } else if !isReady, autoShutterTask != nil {

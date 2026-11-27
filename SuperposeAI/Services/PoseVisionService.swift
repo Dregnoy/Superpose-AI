@@ -17,6 +17,7 @@ final class PoseVisionService {
     private let visionQueue = DispatchQueue(label: "com.superposelabs.vision", qos: .userInitiated)
     private var isProcessing = false
     private var lastProcessedTime: CFAbsoluteTime = 0
+    @ObservationIgnored private var smileStreak: Int = 0
 
     /// Adapts frame analysis rate based on device thermal state, low power mode, and <20% battery.
     private var minimumInterval: CFAbsoluteTime {
@@ -77,7 +78,7 @@ final class PoseVisionService {
                 upperBodyOnly: isUpperBodyMode
             )
             let eyesClosed = Self.areEyesClosed(in: faceRequest.results)
-            let isGoodSmile = !eyesClosed && Self.isSmiling(in: faceRequest.results)
+            let rawSmile = !eyesClosed && Self.isSmiling(in: faceRequest.results)
             let faceAngleHint = Self.faceAngleHint(in: faceRequest.results)
             let faceBox: CGRect? = faceRequest.results?.first.map { obs in
                 let b = obs.boundingBox
@@ -97,6 +98,8 @@ final class PoseVisionService {
 
             Task { @MainActor [weak self] in
                 guard let self else { return }
+                self.smileStreak = rawSmile ? (self.smileStreak + 1) : 0
+                let isGoodSmile = self.smileStreak >= 3
                 self.guidance = LiveGuidanceState(
                     lighting: lighting,
                     framing: framing,
@@ -269,15 +272,27 @@ final class PoseVisionService {
         let ys = lips.map(\.y)
         guard let minX = xs.min(), let maxX = xs.max(),
               let minY = ys.min(), let maxY = ys.max() else { return false }
-        let width = maxX - minX
-        let height = maxY - minY
-        guard width > 0.08, height > 0.01 else { return false }
-        // Wide mouth + corner points raised relative to center
+        let mouthWidth = maxX - minX
+        let mouthHeight = maxY - minY
+        guard mouthWidth >= 0.40, mouthHeight > 0.02 else { return false }
+
+        // Check mouth width relative to outer eye span when eyes are detected
+        if let leftEyePts = face.landmarks?.leftEye?.normalizedPoints,
+           let rightEyePts = face.landmarks?.rightEye?.normalizedPoints,
+           let minEyeX = leftEyePts.map(\.x).min(),
+           let maxEyeX = rightEyePts.map(\.x).max() {
+            let eyeSpan = maxEyeX - minEyeX
+            if eyeSpan > 0.1 && mouthWidth < eyeSpan * 0.88 {
+                return false
+            }
+        }
+
+        // Corners must be distinctly lifted above the mouth vertical midpoint (Vision Y is upward)
         let leftCorner = lips.min(by: { $0.x < $1.x })
         let rightCorner = lips.max(by: { $0.x < $1.x })
         let midY = (minY + maxY) / 2.0
-        let cornersRaised = ((leftCorner?.y ?? midY) + (rightCorner?.y ?? midY)) / 2.0 >= midY - 0.01
-        return (width / height) > 2.2 && cornersRaised
+        let cornerAvgY = ((leftCorner?.y ?? midY) + (rightCorner?.y ?? midY)) / 2.0
+        return cornerAvgY > midY + 0.012
     }
 
     // MARK: - Couples Depth/Size Balance
