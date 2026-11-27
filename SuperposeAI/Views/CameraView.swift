@@ -601,7 +601,6 @@ struct CameraView: View {
                     }
                 }
             }
-        }
     }
 
     // MARK: - Bottom Camera Controls (Fits Every iPhone Width)
