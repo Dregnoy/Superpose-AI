@@ -25,6 +25,9 @@ struct CameraView: View {
     @State private var lastAutoShotTime: CFAbsoluteTime = 0
     @State private var selectedInspoItem: PhotosPickerItem?
     @State private var timerSeconds: Int = 0 // 0, 3, or 10
+    @State private var intervalSeconds: Int = 0 // 0, 3, or 5 (Time-Lapse)
+    @State private var intervalTask: Task<Void, Never>?
+    @State private var intervalShotsCount: Int = 0
     @State private var isBurstEnabled: Bool = false
     @State private var isVideoMode: Bool = false
     @State private var recordingSeconds: Int = 0
@@ -202,9 +205,9 @@ struct CameraView: View {
                 .scaleEffect(x: appState.isOverlayMirrored ? -1 : 1, y: 1)
             }
 
-            // Subtle Eye Blink, Background Line, Face Angle, Shake & Couples Balance Alerts
+            // Subtle Eye Blink, Background Line, Face Angle, Contrast, Shake & Couples Balance Alerts
             let showShakeAlert = horizonService.isShaking && (isProMode && manualShutter >= 0.04)
-            if visionService.guidance.eyesClosed || visionService.guidance.backgroundPoleWarning || visionService.guidance.couplesBalanceHint != nil || visionService.guidance.faceAngleHint != nil || showShakeAlert {
+            if visionService.guidance.eyesClosed || visionService.guidance.backgroundPoleWarning || visionService.guidance.couplesBalanceHint != nil || visionService.guidance.faceAngleHint != nil || visionService.guidance.subjectContrastHint != nil || showShakeAlert {
                 VStack(spacing: 6) {
                     Spacer().frame(height: 96)
                     if showShakeAlert {
@@ -230,6 +233,14 @@ struct CameraView: View {
                             .padding(.vertical, 5)
                             .background(Color.yellow.opacity(0.9), in: Capsule())
                             .foregroundStyle(.black)
+                    }
+                    if let contrastHint = visionService.guidance.subjectContrastHint {
+                        Label(contrastHint, systemImage: "circle.lefthalf.filled")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.purple.opacity(0.85), in: Capsule())
+                            .foregroundStyle(.white)
                     }
                     if let faceHint = visionService.guidance.faceAngleHint {
                         Label(faceHint, systemImage: "face.smiling")
@@ -350,6 +361,8 @@ struct CameraView: View {
         }
         .onDisappear {
             autoShutterTask?.cancel()
+            intervalTask?.cancel()
+            intervalTask = nil
             voiceCoach.stop()
             voiceShutter.stop()
             volumeShutter.stop()
@@ -412,6 +425,15 @@ struct CameraView: View {
                     .background(Color.red.opacity(0.35), in: Capsule())
                 }
 
+                if intervalTask != nil {
+                    Text("Aralıklı: \(intervalShotsCount)")
+                        .font(.caption.monospacedDigit().bold())
+                        .foregroundStyle(.black)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 6)
+                        .background(Color.cyan, in: Capsule())
+                }
+
                 Spacer(minLength: 4)
 
                 Text(visionService.guidance.framing.message)
@@ -424,8 +446,15 @@ struct CameraView: View {
                     .background(.ultraThinMaterial, in: Capsule())
             }
 
-            HStack(spacing: 8) {
-                if let pinned = appState.pinnedPose {
+            if !appState.isOneHandedMode {
+                quickPoseAndGuideRow
+            }
+        }
+    }
+
+    private var quickPoseAndGuideRow: some View {
+        HStack(spacing: 8) {
+            if let pinned = appState.pinnedPose {
                     HStack(spacing: 6) {
                         Button {
                             appState.cyclePinnedPose(step: -1)
@@ -591,6 +620,7 @@ struct CameraView: View {
         appState.isAutoShutterEnabled ||
         appState.gridMode != .off ||
         timerSeconds > 0 ||
+        intervalSeconds > 0 ||
         isBurstEnabled ||
         voiceShutter.isListening ||
         isProMode
@@ -598,6 +628,10 @@ struct CameraView: View {
 
     private var bottomControlsHUD: some View {
         VStack(spacing: 10) {
+            if appState.isOneHandedMode {
+                quickPoseAndGuideRow
+            }
+
             if showToolsDrawer {
                 // Compact Tools Strip (scrollable so OTO / PRO never truncate to "...")
                 ScrollView(.horizontal, showsIndicators: false) {
@@ -679,6 +713,24 @@ struct CameraView: View {
                         .foregroundStyle(isBurstEnabled ? .black : .white)
                         .frame(width: 34, height: 34)
                         .background(isBurstEnabled ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
+                }
+
+                Button {
+                    intervalSeconds = (intervalSeconds == 0) ? 3 : (intervalSeconds == 3 ? 5 : 0)
+                    showToast(intervalSeconds > 0 ? "Aralıklı çekim: Her \(intervalSeconds) sn" : "Aralıklı çekim kapalı")
+                } label: {
+                    HStack(spacing: 2) {
+                        Image(systemName: "repeat")
+                        if intervalSeconds > 0 {
+                            Text("\(intervalSeconds)sn")
+                        }
+                    }
+                    .font(.caption2.bold())
+                    .fixedSize(horizontal: true, vertical: false)
+                    .foregroundStyle(intervalSeconds > 0 ? .black : .white)
+                    .padding(.horizontal, intervalSeconds > 0 ? 8 : 0)
+                    .frame(minWidth: 34, minHeight: 34)
+                    .background(intervalSeconds > 0 ? AnyShapeStyle(Color.orange) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
                 }
 
                 Button {
@@ -835,6 +887,8 @@ struct CameraView: View {
                         } else {
                             Task { await recordVideoClip() }
                         }
+                    } else if intervalSeconds > 0 {
+                        toggleIntervalShooting()
                     } else if autoShutterTask != nil {
                         autoShutterTask?.cancel()
                         autoShutterTask = nil
@@ -1152,6 +1206,8 @@ struct CameraView: View {
                         } else {
                             Task { await recordVideoClip() }
                         }
+                    } else if intervalSeconds > 0 {
+                        toggleIntervalShooting()
                     } else if autoShutterTask != nil {
                         autoShutterTask?.cancel()
                         autoShutterTask = nil
@@ -1424,6 +1480,25 @@ struct CameraView: View {
             autoShutterCountdown = nil
             autoShutterTask = nil
             await captureAndSavePhoto()
+        }
+    }
+
+    private func toggleIntervalShooting() {
+        if let existing = intervalTask {
+            existing.cancel()
+            intervalTask = nil
+            showToast("Aralıklı çekim durduruldu (\(intervalShotsCount) kare)")
+            return
+        }
+        intervalShotsCount = 0
+        let step = intervalSeconds
+        showToast("Aralıklı çekim başladı (Her \(step) sn)")
+        intervalTask = Task {
+            while !Task.isCancelled {
+                await captureAndSavePhoto()
+                intervalShotsCount += 1
+                try? await Task.sleep(for: .seconds(step))
+            }
         }
     }
 

@@ -244,6 +244,7 @@ struct LiveGuidanceState: Equatable {
     var backgroundPoleWarning: Bool = false
     var couplesBalanceHint: String? = nil
     var faceAngleHint: String? = nil
+    var subjectContrastHint: String? = nil
     var detectedFaceBox: CGRect? = nil
     var detectedSkeleton: PoseSkeleton? = nil
     var detectedSecondarySkeleton: PoseSkeleton? = nil

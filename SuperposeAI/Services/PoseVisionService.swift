@@ -86,6 +86,10 @@ final class PoseVisionService {
             }
             let couplesHint = Self.evaluateCouplesBalance(first: detectedSkeleton, second: detectedSecondary)
             let poleWarning = Self.detectVerticalLineBehindHead(in: pixelBuffer, nose: detectedSkeleton?.joints[.nose])
+            let contrastDiff = abs(metrics.average - metrics.edgeAverage)
+            let subjectContrastHint: String? = (detectedSkeleton != nil && contrastDiff < 0.06)
+                ? "Arka plan karışık — Portre Bokeh dene"
+                : nil
             let matchScore: Int? = {
                 guard let targetPose, let detectedSkeleton else { return nil }
                 let primary = Self.computePoseMatchScore(live: detectedSkeleton, target: targetPose.skeleton)
@@ -110,6 +114,7 @@ final class PoseVisionService {
                     backgroundPoleWarning: poleWarning,
                     couplesBalanceHint: couplesHint,
                     faceAngleHint: faceAngleHint,
+                    subjectContrastHint: subjectContrastHint,
                     detectedFaceBox: faceBox,
                     detectedSkeleton: detectedSkeleton,
                     detectedSecondarySkeleton: detectedSecondary
