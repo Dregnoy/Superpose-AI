@@ -66,6 +66,12 @@ final class LibraryStore {
         persist()
     }
 
+    func toggleFavorite(id: UUID) {
+        guard let idx = items.firstIndex(where: { $0.id == id }) else { return }
+        items[idx].isFavorite.toggle()
+        persist()
+    }
+
     func saveToApplePhotos(_ item: LibraryItem) async -> Bool {
         guard let uiImage = image(for: item) else { return false }
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)

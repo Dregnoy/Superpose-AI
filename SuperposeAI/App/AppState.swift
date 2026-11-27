@@ -170,4 +170,15 @@ final class AppState {
             createdAt: current.createdAt
         )
     }
+
+    func cyclePinnedPose(step: Int) {
+        let pool = latestGeneratedPoses.isEmpty ? (savedCustomPoses + MockPoseCatalog.quickOfflinePoses) : latestGeneratedPoses
+        guard !pool.isEmpty else { return }
+        if let current = pinnedPose, let idx = pool.firstIndex(where: { $0.id == current.id }) {
+            let nextIdx = (idx + step + pool.count) % pool.count
+            pinnedPose = pool[nextIdx]
+        } else {
+            pinnedPose = pool.first
+        }
+    }
 }

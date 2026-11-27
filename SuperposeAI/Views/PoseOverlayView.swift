@@ -72,6 +72,8 @@ struct PoseOverlayView: View {
 
         if mode == .detailedContour {
             drawBodyEnvelope(skeleton, in: &context, size: size, color: tint.opacity(0.28))
+        } else {
+            drawBodyEnvelope(skeleton, in: &context, size: size, color: tint.opacity(0.12))
         }
 
         for (startJoint, endJoint) in PoseSkeleton.boneConnections {

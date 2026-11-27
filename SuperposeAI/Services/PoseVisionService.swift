@@ -79,6 +79,10 @@ final class PoseVisionService {
             let eyesClosed = Self.areEyesClosed(in: faceRequest.results)
             let isGoodSmile = !eyesClosed && Self.isSmiling(in: faceRequest.results)
             let faceAngleHint = Self.faceAngleHint(in: faceRequest.results)
+            let faceBox: CGRect? = faceRequest.results?.first.map { obs in
+                let b = obs.boundingBox
+                return CGRect(x: b.minX, y: 1.0 - b.maxY, width: b.width, height: b.height)
+            }
             let couplesHint = Self.evaluateCouplesBalance(first: detectedSkeleton, second: detectedSecondary)
             let poleWarning = Self.detectVerticalLineBehindHead(in: pixelBuffer, nose: detectedSkeleton?.joints[.nose])
             let matchScore: Int? = {
@@ -103,6 +107,7 @@ final class PoseVisionService {
                     backgroundPoleWarning: poleWarning,
                     couplesBalanceHint: couplesHint,
                     faceAngleHint: faceAngleHint,
+                    detectedFaceBox: faceBox,
                     detectedSkeleton: detectedSkeleton,
                     detectedSecondarySkeleton: detectedSecondary
                 )

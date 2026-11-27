@@ -7,10 +7,18 @@ struct LibraryView: View {
     @Environment(AppState.self) private var appState
     @Environment(LibraryStore.self) private var libraryStore
 
+    enum LibraryFilter: String, CaseIterable, Identifiable {
+        case all = "Tümü"
+        case posed = "Pozlu"
+        case favorites = "Favoriler"
+
+        var id: String { rawValue }
+    }
+
     @State private var isMultiSelectMode = false
     @State private var selectedIDs: Set<UUID> = []
     @State private var viewingItem: LibraryItem?
-    @State private var filterPosedOnly = false
+    @State private var libraryFilter: LibraryFilter = .all
     @State private var pickedPhotoItem: PhotosPickerItem?
     @State private var isExtractingPose = false
     @State private var poseExtractAlert: String?
@@ -32,17 +40,22 @@ struct LibraryView: View {
                     )
                 } else {
                     ScrollView {
-                        Picker("Filtre", selection: $filterPosedOnly) {
-                            Text("Tümü").tag(false)
-                            Text("Pozlu Çekimler").tag(true)
+                        Picker("Filtre", selection: $libraryFilter) {
+                            ForEach(LibraryFilter.allCases) { f in
+                                Text(f.rawValue).tag(f)
+                            }
                         }
                         .pickerStyle(.segmented)
                         .padding(.horizontal)
                         .padding(.vertical, 6)
 
-                        let displayedItems = filterPosedOnly
-                            ? libraryStore.items.filter { $0.poseIdea != nil }
-                            : libraryStore.items
+                        let displayedItems: [LibraryItem] = {
+                            switch libraryFilter {
+                            case .all: return libraryStore.items
+                            case .posed: return libraryStore.items.filter { $0.poseIdea != nil }
+                            case .favorites: return libraryStore.items.filter { $0.isFavorite }
+                            }
+                        }()
 
                         LazyVGrid(columns: columns, spacing: 3) {
                             ForEach(displayedItems) { item in
@@ -185,6 +198,12 @@ struct LibraryView: View {
                 Image(systemName: isSelected ? "checkmark.circle.fill" : "circle")
                     .font(.title3)
                     .foregroundStyle(isSelected ? .cyan : .white)
+                    .padding(6)
+                    .shadow(radius: 2)
+            } else if item.isFavorite {
+                Image(systemName: "star.fill")
+                    .font(.caption)
+                    .foregroundStyle(.yellow)
                     .padding(6)
                     .shadow(radius: 2)
             }
@@ -519,7 +538,16 @@ struct ResultViewerSheet: View {
                     }
                 }
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button("Bitti") { dismiss() }
+                    HStack(spacing: 12) {
+                        Button {
+                            libraryStore.toggleFavorite(id: item.id)
+                        } label: {
+                            let isFav = libraryStore.items.first(where: { $0.id == item.id })?.isFavorite ?? item.isFavorite
+                            Image(systemName: isFav ? "star.fill" : "star")
+                                .foregroundStyle(isFav ? .yellow : .primary)
+                        }
+                        Button("Bitti") { dismiss() }
+                    }
                 }
             }
         }

@@ -173,6 +173,19 @@ struct CameraView: View {
                     .allowsHitTesting(false)
             }
 
+            // Eye-AF / Face Tracking Bracket
+            if let faceBox = visionService.guidance.detectedFaceBox {
+                FaceTrackingBoxView(
+                    normalizedBox: faceBox,
+                    isMirrored: cameraService.cameraPosition == .front,
+                    color: visionService.guidance.eyesClosed
+                        ? .orange
+                        : (visionService.guidance.isGoodSmile ? .green : .cyan.opacity(0.85))
+                )
+                .ignoresSafeArea()
+                .allowsHitTesting(false)
+            }
+
             // Pose Outline Overlay
             if let pinned = appState.pinnedPose {
                 PoseOverlayView(
@@ -413,9 +426,23 @@ struct CameraView: View {
             HStack(spacing: 8) {
                 if let pinned = appState.pinnedPose {
                     HStack(spacing: 6) {
+                        Button {
+                            appState.cyclePinnedPose(step: -1)
+                        } label: {
+                            Image(systemName: "chevron.left")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                        }
                         Text(pinned.title)
                             .font(.caption.bold())
                             .lineLimit(1)
+                        Button {
+                            appState.cyclePinnedPose(step: 1)
+                        } label: {
+                            Image(systemName: "chevron.right")
+                                .font(.caption2.bold())
+                                .foregroundStyle(.secondary)
+                        }
                         Button {
                             appState.toggleSavePose(pinned)
                             showToast(appState.isPoseSaved(pinned) ? "Poz kaydedildi" : "Kayıttan çıkarıldı")
@@ -1546,6 +1573,28 @@ struct HorizonLevelIndicatorView: View {
                 .fill(isLevel ? Color.green : Color.yellow)
                 .frame(width: 48, height: isLevel ? 2 : 1.5)
                 .rotationEffect(.degrees(-rollDegrees))
+        }
+    }
+}
+
+struct FaceTrackingBoxView: View {
+    let normalizedBox: CGRect
+    let isMirrored: Bool
+    let color: Color
+
+    var body: some View {
+        GeometryReader { geo in
+            let w = normalizedBox.width * geo.size.width
+            let h = normalizedBox.height * geo.size.height
+            let rawX = normalizedBox.minX * geo.size.width
+            let x = isMirrored ? (geo.size.width - rawX - w) : rawX
+            let y = normalizedBox.minY * geo.size.height
+
+            RoundedRectangle(cornerRadius: 8)
+                .stroke(color, style: StrokeStyle(lineWidth: 1.5, dash: [8, 6]))
+                .frame(width: w, height: h)
+                .position(x: x + w / 2, y: y + h / 2)
+                .animation(.easeOut(duration: 0.12), value: normalizedBox)
         }
     }
 }

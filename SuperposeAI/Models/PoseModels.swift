@@ -244,6 +244,7 @@ struct LiveGuidanceState: Equatable {
     var backgroundPoleWarning: Bool = false
     var couplesBalanceHint: String? = nil
     var faceAngleHint: String? = nil
+    var detectedFaceBox: CGRect? = nil
     var detectedSkeleton: PoseSkeleton? = nil
     var detectedSecondarySkeleton: PoseSkeleton? = nil
 }
@@ -258,6 +259,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
     let zoomFactor: Double?
     let overlayModeRaw: String?
     let rollDegrees: Double?
+    var isFavorite: Bool
     let createdAt: Date
 
     init(
@@ -268,6 +270,7 @@ struct LibraryItem: Identifiable, Codable, Hashable {
         zoomFactor: Double? = nil,
         overlayModeRaw: String? = nil,
         rollDegrees: Double? = nil,
+        isFavorite: Bool = false,
         createdAt: Date = .now
     ) {
         self.id = id
@@ -277,6 +280,20 @@ struct LibraryItem: Identifiable, Codable, Hashable {
         self.zoomFactor = zoomFactor
         self.overlayModeRaw = overlayModeRaw
         self.rollDegrees = rollDegrees
+        self.isFavorite = isFavorite
         self.createdAt = createdAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.id = try c.decode(UUID.self, forKey: .id)
+        self.imageFilename = try c.decode(String.self, forKey: .imageFilename)
+        self.isGeneratedReference = try c.decode(Bool.self, forKey: .isGeneratedReference)
+        self.poseIdea = try c.decodeIfPresent(PoseIdea.self, forKey: .poseIdea)
+        self.zoomFactor = try c.decodeIfPresent(Double.self, forKey: .zoomFactor)
+        self.overlayModeRaw = try c.decodeIfPresent(String.self, forKey: .overlayModeRaw)
+        self.rollDegrees = try c.decodeIfPresent(Double.self, forKey: .rollDegrees)
+        self.isFavorite = try c.decodeIfPresent(Bool.self, forKey: .isFavorite) ?? false
+        self.createdAt = try c.decode(Date.self, forKey: .createdAt)
     }
 }
