@@ -40,6 +40,8 @@ final class CameraService: NSObject {
     @ObservationIgnored nonisolated(unsafe) private var currentInput: AVCaptureDeviceInput?
     @ObservationIgnored nonisolated(unsafe) private var currentPosition: AVCaptureDevice.Position = .back
     @ObservationIgnored nonisolated(unsafe) private var currentFlashMode: AVCaptureDevice.FlashMode = .off
+    @ObservationIgnored nonisolated(unsafe) private var isFocusLockedByUser: Bool = false
+    @ObservationIgnored nonisolated(unsafe) private var subjectAreaObserver: NSObjectProtocol?
     @ObservationIgnored private var photoContinuation: CheckedContinuation<(UIImage, Data?), Error>?
     @ObservationIgnored private var pendingProcessedImage: UIImage?
     @ObservationIgnored private var pendingRawDNGData: Data?
@@ -120,8 +122,10 @@ final class CameraService: NSObject {
     func focusAndExpose(at normalizedPoint: CGPoint, lock: Bool = false) {
         sessionQueue.async { [weak self] in
             guard let self, let device = self.currentInput?.device else { return }
+            self.isFocusLockedByUser = lock
             do {
                 try device.lockForConfiguration()
+                device.isSubjectAreaChangeMonitoringEnabled = !lock
                 if device.isFocusPointOfInterestSupported {
                     device.focusPointOfInterest = normalizedPoint
                     device.focusMode = lock ? .locked : .autoFocus
@@ -134,6 +138,31 @@ final class CameraService: NSObject {
             } catch {
                 // Ignore if device is busy
             }
+        }
+    }
+
+    nonisolated private func enableContinuousAutoFocus(on device: AVCaptureDevice) {
+        do {
+            try device.lockForConfiguration()
+            device.isSubjectAreaChangeMonitoringEnabled = true
+            if device.isFocusPointOfInterestSupported {
+                device.focusPointOfInterest = CGPoint(x: 0.5, y: 0.5)
+            }
+            if device.isFocusModeSupported(.continuousAutoFocus) {
+                device.focusMode = .continuousAutoFocus
+            }
+            if device.isSmoothAutoFocusSupported {
+                device.isSmoothAutoFocusEnabled = true
+            }
+            if device.isExposurePointOfInterestSupported {
+                device.exposurePointOfInterest = CGPoint(x: 0.5, y: 0.5)
+            }
+            if device.isExposureModeSupported(.continuousAutoExposure) {
+                device.exposureMode = .continuousAutoExposure
+            }
+            device.unlockForConfiguration()
+        } catch {
+            // Ignore if device is busy
         }
     }
 
@@ -380,6 +409,21 @@ final class CameraService: NSObject {
 
         session.addInput(input)
         currentInput = input
+        isFocusLockedByUser = false
+        enableContinuousAutoFocus(on: device)
+
+        if subjectAreaObserver == nil {
+            subjectAreaObserver = NotificationCenter.default.addObserver(
+                forName: AVCaptureDevice.subjectAreaDidChangeNotification,
+                object: nil,
+                queue: nil
+            ) { [weak self] _ in
+                self?.sessionQueue.async { [weak self] in
+                    guard let self, !self.isFocusLockedByUser, let activeDevice = self.currentInput?.device else { return }
+                    self.enableContinuousAutoFocus(on: activeDevice)
+                }
+            }
+        }
 
         if !session.outputs.contains(videoOutput) {
             videoOutput.alwaysDiscardsLateVideoFrames = true
