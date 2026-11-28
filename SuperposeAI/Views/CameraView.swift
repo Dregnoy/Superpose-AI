@@ -577,8 +577,8 @@ struct CameraView: View {
         let isFront = cameraService.cameraPosition == .front
         var best: (BodyJoint, CGPoint, CGFloat)?
         for (joint, pt) in skeleton.joints {
-            let x = (isFront ? (1.0 - pt.x) : pt.x) * size.width
-            let y = pt.y * size.height
+            let x = CGFloat(isFront ? (1.0 - pt.x) : pt.x) * size.width
+            let y = CGFloat(pt.y) * size.height
             let dist = hypot(location.x - x, location.y - y)
             if dist <= 44, best == nil || dist < best!.2 {
                 best = (joint, CGPoint(x: x, y: y), dist)

@@ -458,7 +458,7 @@ final class CameraService: NSObject {
                 let bracketSettings = biases.map {
                     AVCaptureAutoExposureBracketedStillImageSettings.autoExposureSettings(exposureTargetBias: $0)
                 }
-                let settings = AVCapturePhotoBracketedStillImageSettings(
+                let settings = AVCapturePhotoBracketSettings(
                     rawPixelFormatType: 0,
                     processedFormat: [AVVideoCodecKey: AVVideoCodecType.jpeg],
                     bracketedSettings: bracketSettings
