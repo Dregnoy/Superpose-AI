@@ -285,80 +285,94 @@ struct ResultViewerSheet: View {
                 }
                 .padding(.horizontal)
 
-                HStack(spacing: 10) {
-                    Button {
-                        dismiss()
-                        appState.reshotFromLibrary(item)
-                    } label: {
-                        Label("Tekrar Çek", systemImage: "camera.rotate")
-                            .font(.caption.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.cyan, in: RoundedRectangle(cornerRadius: 12))
-                            .foregroundStyle(.black)
-                    }
-
-                    Button {
-                        if let img = libraryStore.image(for: item) {
+                VStack(spacing: 8) {
+                    HStack(spacing: 10) {
+                        Button {
                             dismiss()
-                            appState.startGhostReference(img, item: item)
-                        }
-                    } label: {
-                        Label("Hayalet", systemImage: "person.fill.viewfinder")
-                            .font(.caption.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-                            .foregroundStyle(.white)
-                    }
-
-                    Button {
-                        Task {
-                            if let img = styledImage() {
-                                savedToPhotos = await saveImageToPhotos(img)
-                            }
-                        }
-                    } label: {
-                        Label(savedToPhotos ? "Kaydedildi!" : "Kaydet", systemImage: savedToPhotos ? "checkmark" : "square.and.arrow.down")
-                            .font(.subheadline.bold())
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 12)
-                            .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
-                            .foregroundStyle(.white)
-                    }
-
-                    if let shareImage = buildShareImage() {
-                        ShareLink(
-                            item: Image(uiImage: shareImage),
-                            preview: SharePreview("Superpose Çekimi", image: Image(uiImage: shareImage))
-                        ) {
-                            Label(hasBeforePhoto ? "Önce/Sonra" : "Paylaş", systemImage: "square.and.arrow.up")
+                            appState.reshotFromLibrary(item)
+                        } label: {
+                            Label("Tekrar Çek", systemImage: "camera.rotate")
                                 .font(.subheadline.bold())
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
                                 .frame(maxWidth: .infinity)
                                 .padding(.vertical, 12)
+                                .background(Color.cyan, in: RoundedRectangle(cornerRadius: 12))
+                                .foregroundStyle(.black)
+                        }
+
+                        Button {
+                            Task {
+                                if let img = styledImage() {
+                                    savedToPhotos = await saveImageToPhotos(img)
+                                }
+                            }
+                        } label: {
+                            Label(savedToPhotos ? "Kaydedildi!" : "Kaydet", systemImage: savedToPhotos ? "checkmark" : "square.and.arrow.down")
+                                .font(.subheadline.bold())
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.85)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 12)
+                                .background(savedToPhotos ? Color.green.opacity(0.35) : Color.white.opacity(0.14), in: RoundedRectangle(cornerRadius: 12))
+                                .foregroundStyle(.white)
+                        }
+                    }
+
+                    HStack(spacing: 8) {
+                        Button {
+                            if let img = libraryStore.image(for: item) {
+                                dismiss()
+                                appState.startGhostReference(img, item: item)
+                            }
+                        } label: {
+                            Label("Hayalet", systemImage: "person.fill.viewfinder")
+                                .font(.caption.bold())
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 11)
                                 .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                                 .foregroundStyle(.white)
                         }
-                        .simultaneousGesture(TapGesture().onEnded {
-                            ShootingMetricsStore.shared.recordShare()
-                        })
-                    }
 
-                    if let storyCard = buildStoryCardImage() {
-                        ShareLink(
-                            item: Image(uiImage: storyCard),
-                            preview: SharePreview("Superpose Hikâye Kartı", image: Image(uiImage: storyCard))
-                        ) {
-                            Label("Kart", systemImage: "rectangle.portrait.on.rectangle.portrait.angled")
-                                .font(.caption.bold())
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 12)
-                                .background(Color.purple.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
-                                .foregroundStyle(.white)
+                        if let shareImage = buildShareImage() {
+                            ShareLink(
+                                item: Image(uiImage: shareImage),
+                                preview: SharePreview("Superpose Çekimi", image: Image(uiImage: shareImage))
+                            ) {
+                                Label(hasBeforePhoto ? "Önce/Sonra" : "Paylaş", systemImage: "square.and.arrow.up")
+                                    .font(.caption.bold())
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 11)
+                                    .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
+                                    .foregroundStyle(.white)
+                            }
+                            .simultaneousGesture(TapGesture().onEnded {
+                                ShootingMetricsStore.shared.recordShare()
+                            })
                         }
-                        .simultaneousGesture(TapGesture().onEnded {
-                            ShootingMetricsStore.shared.recordShare()
-                        })
+
+                        if let storyCard = buildStoryCardImage() {
+                            ShareLink(
+                                item: Image(uiImage: storyCard),
+                                preview: SharePreview("Superpose Hikâye Kartı", image: Image(uiImage: storyCard))
+                            ) {
+                                Label("Kart", systemImage: "rectangle.portrait.on.rectangle.portrait.angled")
+                                    .font(.caption.bold())
+                                    .lineLimit(1)
+                                    .minimumScaleFactor(0.8)
+                                    .frame(maxWidth: .infinity)
+                                    .padding(.vertical, 11)
+                                    .background(Color.purple.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+                                    .foregroundStyle(.white)
+                            }
+                            .simultaneousGesture(TapGesture().onEnded {
+                                ShootingMetricsStore.shared.recordShare()
+                            })
+                        }
                     }
                 }
                 .padding(.horizontal)
