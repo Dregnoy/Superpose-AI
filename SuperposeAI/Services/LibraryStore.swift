@@ -1,5 +1,6 @@
 import UIKit
 import Photos
+import UniformTypeIdentifiers
 
 @MainActor
 @Observable
@@ -34,9 +35,11 @@ final class LibraryStore: LibraryStoring {
         rollDegrees: Double? = nil,
         qualityScore: Double? = nil
     ) -> UUID {
-        let filename = "\(UUID().uuidString).jpg"
+        let encoded = Self.encodeHEIFData(from: image)
+        let ext = (encoded?.isHEIC == true) ? "heic" : "jpg"
+        let filename = "\(UUID().uuidString).\(ext)"
         let fileURL = libraryDirectory.appendingPathComponent(filename)
-        if let data = image.jpegData(compressionQuality: 0.9) {
+        if let data = encoded?.data {
             try? data.write(to: fileURL)
         }
 
@@ -82,19 +85,54 @@ final class LibraryStore: LibraryStoring {
         persist()
     }
 
-    func saveToApplePhotos(_ item: LibraryItem) async -> Bool {
-        guard let uiImage = image(for: item) else { return false }
+    static func encodeHEIFData(from image: UIImage) -> (data: Data, isHEIC: Bool)? {
+        if let heic = image.heicData() {
+            return (heic, true)
+        }
+        if let jpeg = image.jpegData(compressionQuality: 0.92) {
+            return (jpeg, false)
+        }
+        return nil
+    }
+
+    static func saveImageToApplePhotos(_ image: UIImage) async -> Bool {
+        guard let encoded = encodeHEIFData(from: image) else { return false }
         let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
         guard status == .authorized || status == .limited else { return false }
 
         do {
             try await PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.creationRequestForAsset(from: uiImage)
+                let request = PHAssetCreationRequest.forAsset()
+                let options = PHAssetResourceCreationOptions()
+                options.uniformTypeIdentifier = encoded.isHEIC ? UTType.heic.identifier : UTType.jpeg.identifier
+                request.addResource(with: .photo, data: encoded.data, options: options)
             }
             return true
         } catch {
             return false
         }
+    }
+
+    func saveToApplePhotos(_ item: LibraryItem) async -> Bool {
+        let fileURL = libraryDirectory.appendingPathComponent(item.imageFilename)
+        if let data = try? Data(contentsOf: fileURL) {
+            let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
+            guard status == .authorized || status == .limited else { return false }
+            let isHEIC = item.imageFilename.lowercased().hasSuffix(".heic")
+            do {
+                try await PHPhotoLibrary.shared().performChanges {
+                    let request = PHAssetCreationRequest.forAsset()
+                    let options = PHAssetResourceCreationOptions()
+                    options.uniformTypeIdentifier = isHEIC ? UTType.heic.identifier : UTType.jpeg.identifier
+                    request.addResource(with: .photo, data: data, options: options)
+                }
+                return true
+            } catch {
+                return false
+            }
+        }
+        guard let uiImage = image(for: item) else { return false }
+        return await Self.saveImageToApplePhotos(uiImage)
     }
 
     func saveVideoToApplePhotos(_ fileURL: URL) async -> Bool {

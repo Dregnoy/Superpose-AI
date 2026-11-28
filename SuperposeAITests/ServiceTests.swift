@@ -221,4 +221,16 @@ struct ServiceTests {
         #expect(consumed.size.width > 0)
         #expect(SharedPoseImportStore.consumeSharedImage() == nil)
     }
+
+    @Test("LibraryStore encodeHEIFData encodes valid image data")
+    @MainActor
+    func heifEncodingProducesData() throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 32, height: 32))
+        let img = renderer.image { ctx in
+            UIColor.systemBlue.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 32, height: 32))
+        }
+        let encoded = try #require(LibraryStore.encodeHEIFData(from: img))
+        #expect(!encoded.data.isEmpty)
+    }
 }

@@ -647,15 +647,6 @@ struct ResultViewerSheet: View {
     }
 
     private func saveImageToPhotos(_ image: UIImage) async -> Bool {
-        let status = await PHPhotoLibrary.requestAuthorization(for: .addOnly)
-        guard status == .authorized || status == .limited else { return false }
-        do {
-            try await PHPhotoLibrary.shared().performChanges {
-                PHAssetChangeRequest.creationRequestForAsset(from: image)
-            }
-            return true
-        } catch {
-            return false
-        }
+        await LibraryStore.saveImageToApplePhotos(image)
     }
 }
