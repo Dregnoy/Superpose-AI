@@ -505,9 +505,9 @@ extension CameraView {
                             .background(.ultraThinMaterial, in: Circle())
                     }
                 }
+                }
                 .padding(.horizontal, 12)
                 }
-            }
             }
 
             if isProMode && cameraService.cameraPosition == .back {
