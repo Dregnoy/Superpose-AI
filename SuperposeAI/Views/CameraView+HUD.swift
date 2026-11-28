@@ -353,7 +353,7 @@ extension CameraView {
     }
 
     var bottomControlsHUD: some View {
-        VStack(spacing: 10) {
+        VStack(spacing: 6) {
             if appState.isOneHandedMode {
                 quickPoseAndGuideRow
             }
@@ -499,8 +499,8 @@ extension CameraView {
                             .background(.ultraThinMaterial, in: Circle())
                     }
                 }
+                .padding(.horizontal, 12)
                 }
-                .padding(.horizontal, 2)
             }
             }
 
@@ -579,14 +579,14 @@ extension CameraView {
             }
 
             // Simple Mode: Flash + Foto/Video + Timer (+ Tools Drawer only in Pro Mode)
-            HStack(spacing: 8) {
+            HStack(spacing: 6) {
                 Button {
                     cameraService.toggleFlash()
                 } label: {
                     Image(systemName: cameraService.flashMode == .on ? "bolt.fill" : (cameraService.flashMode == .auto ? "bolt.badge.a.fill" : "bolt.slash"))
                         .font(.caption)
                         .foregroundStyle(cameraService.flashMode == .on ? .yellow : .white)
-                        .frame(width: 32, height: 32)
+                        .frame(width: 30, height: 30)
                         .background(.ultraThinMaterial, in: Circle())
                 }
                 .buttonStyle(.plain)
@@ -597,27 +597,27 @@ extension CameraView {
                             showToolsDrawer.toggle()
                         }
                     } label: {
-                        HStack(spacing: 4) {
+                        HStack(spacing: 3) {
                             Image(systemName: showToolsDrawer ? "chevron.down" : "chevron.up")
                             Text("Araçlar")
                             if hasActiveDrawerTools && !showToolsDrawer {
                                 Circle()
                                     .fill(Color.cyan)
-                                    .frame(width: 6, height: 6)
+                                    .frame(width: 5, height: 5)
                             }
                         }
                         .font(.caption2.bold())
                         .lineLimit(1)
                         .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(showToolsDrawer ? .black : .white)
-                        .padding(.horizontal, 10)
-                        .padding(.vertical, 7)
+                        .padding(.horizontal, 8)
+                        .padding(.vertical, 6)
                         .background(showToolsDrawer ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
 
-                HStack(spacing: 4) {
+                HStack(spacing: 2) {
                     Button {
                         isVideoMode = false
                     } label: {
@@ -626,8 +626,8 @@ extension CameraView {
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(!isVideoMode ? .black : .white)
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
                             .background(!isVideoMode ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(Color.clear), in: Capsule())
                             .contentShape(Capsule())
                     }
@@ -641,8 +641,8 @@ extension CameraView {
                             .lineLimit(1)
                             .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(isVideoMode ? .white : .white.opacity(0.85))
-                            .padding(.horizontal, 12)
-                            .padding(.vertical, 7)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
                             .background(isVideoMode ? AnyShapeStyle(Color.red) : AnyShapeStyle(Color.clear), in: Capsule())
                             .contentShape(Capsule())
                     }
@@ -800,7 +800,7 @@ extension CameraView {
         let ev = max(-3.0, min(3.0, (visionService.guidance.lumaScore - 0.5) * 8.0))
         let evBalanced = abs(ev) <= 0.6
 
-        return VStack(spacing: 6) {
+        return VStack(spacing: 4) {
             // Live Exposure Meter (-3 .. 0 .. +3) + Overexposure Warning
             HStack(spacing: 6) {
                 Text("Pozometre")
@@ -950,9 +950,10 @@ extension CameraView {
                 .foregroundStyle(.yellow)
             }
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.horizontal, 10)
+        .padding(.vertical, 6)
         .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+        .padding(.horizontal, 8)
     }
 
     // MARK: - Landscape Trailing HUD (Apple Camera Style)
