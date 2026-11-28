@@ -141,8 +141,8 @@ def export_coreml(model: SuperposeAestheticNet, output_path: Path) -> None:
             )
         ],
         outputs=[ct.TensorType(name="aestheticScore")],
+        convert_to="neuralnetwork",
         compute_units=ct.ComputeUnit.ALL,
-        compute_precision=ct.precision.FLOAT16,
     )
     mlmodel.author = "Superpose Labs"
     mlmodel.short_description = "On-device portrait & street aesthetic score regressor (0..1)."

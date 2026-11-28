@@ -5,3 +5,4 @@ Payload/
 *.ipa
 *.xcodeproj
 xcuserdata/
+dataset/
