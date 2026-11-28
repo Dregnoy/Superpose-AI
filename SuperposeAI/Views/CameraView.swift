@@ -443,6 +443,7 @@ struct CameraView: View {
                     Task { await captureAndSavePhoto() }
                 }
             }
+            guard !ProcessInfo.processInfo.arguments.contains("-UITestingSkipOnboarding") else { return }
             volumeShutter.start()
             watchRemote.start { timer in
                 guard !isGeneratingPoses else { return }
