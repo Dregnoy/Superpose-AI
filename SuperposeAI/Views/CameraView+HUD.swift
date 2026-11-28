@@ -168,7 +168,8 @@ extension CameraView {
     }
 
     var quickPoseAndGuideRow: some View {
-        HStack(spacing: 8) {
+        ScrollView(.horizontal, showsIndicators: false) {
+            HStack(spacing: 6) {
             if let pinned = appState.pinnedPose {
                     HStack(spacing: 6) {
                         Button {
@@ -302,6 +303,8 @@ extension CameraView {
                     } label: {
                         Text(appState.aspectGuideMode.rawValue)
                             .font(.caption.bold())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                             .padding(.horizontal, 8)
                             .padding(.vertical, 7)
                             .background(
@@ -321,12 +324,15 @@ extension CameraView {
                                 .lineLimit(1)
                         }
                         .font(.caption.bold())
+                        .fixedSize(horizontal: true, vertical: false)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
                         .background(.ultraThinMaterial, in: Capsule())
                     }
                 }
             }
+            .padding(.horizontal, 4)
+        }
     }
 
     // MARK: - Bottom Camera Controls (Fits Every iPhone Width)
