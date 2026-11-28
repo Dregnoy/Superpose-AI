@@ -1,5 +1,6 @@
 import CoreImage
 import CoreML
+import CoreVideo
 import UIKit
 import Vision
 
@@ -74,9 +75,8 @@ enum AestheticScoringService {
             UIImage(cgImage: cgImage).draw(in: CGRect(origin: .zero, size: targetSize))
         }
         guard let resizedCG = resized.cgImage,
-              let input = try? MLDictionaryFeatureProvider(dictionary: [
-                  "image": MLFeatureValue(cgImage: resizedCG, pixelsWide: 224, pixelsHigh: 224, pixelFormatType: kCVPixelFormatType_32BGRA)
-              ]),
+              let imageFeature = try? MLFeatureValue(cgImage: resizedCG, pixelsWide: 224, pixelsHigh: 224, pixelFormatType: kCVPixelFormatType_32BGRA),
+              let input = try? MLDictionaryFeatureProvider(dictionary: ["image": imageFeature]),
               let output = try? mlModel.prediction(from: input),
               let score = output.featureValue(for: "aestheticScore")?.doubleValue else {
             return nil

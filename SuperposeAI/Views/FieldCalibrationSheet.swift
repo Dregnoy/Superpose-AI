@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 /// Field calibration and thermal/AE telemetry sheet for physical iPhone testing.
 struct FieldCalibrationSheet: View {
