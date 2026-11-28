@@ -86,6 +86,7 @@ extension CameraService {
                     } else {
                         settings = AVCapturePhotoSettings()
                     }
+                    settings.maxPhotoDimensions = self.photoOutput.maxPhotoDimensions
                     settings.photoQualityPrioritization = .quality
                 }
                 if self.photoOutput.isAutoRedEyeReductionSupported {

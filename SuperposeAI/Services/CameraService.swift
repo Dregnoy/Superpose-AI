@@ -178,6 +178,9 @@ final class CameraService: NSObject, CameraServicing {
         if !session.outputs.contains(photoOutput), session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
         }
+        if let maxDim = device.activeFormat.supportedMaxPhotoDimensions.max(by: { ($0.width * $0.height) < ($1.width * $1.height) }) {
+            photoOutput.maxPhotoDimensions = maxDim
+        }
         photoOutput.maxPhotoQualityPrioritization = .quality
         if photoOutput.isResponsiveCaptureSupported {
             photoOutput.isResponsiveCaptureEnabled = true

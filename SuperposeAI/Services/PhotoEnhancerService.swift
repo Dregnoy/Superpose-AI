@@ -22,10 +22,15 @@ enum PhotoLookPreset: String, CaseIterable, Identifiable {
 /// and luminance sharpening using CoreImage—zero cloud upload.
 enum PhotoEnhancerService {
     static let context: CIContext = {
+        let p3 = CGColorSpace(name: CGColorSpace.displayP3) ?? CGColorSpaceCreateDeviceRGB()
+        let options: [CIContextOption: Any] = [
+            .workingColorSpace: p3,
+            .outputColorSpace: p3
+        ]
         if let device = MTLCreateSystemDefaultDevice() {
-            return CIContext(mtlDevice: device)
+            return CIContext(mtlDevice: device, options: options)
         }
-        return CIContext()
+        return CIContext(options: options)
     }()
 
     static func applyLook(_ preset: PhotoLookPreset, to image: UIImage) -> UIImage {
@@ -74,13 +79,13 @@ enum PhotoEnhancerService {
     }
 
     /// One-Tap Magic ("Tek Vuruşluk Büyü"): balances dynamic range, micro-contrast,
-    /// skin-safe vibrance, luminance crispness, and a subtle studio vignette on-device.
+    /// skin-safe vibrance, local clarity, luminance crispness, and a subtle studio vignette on-device.
     static func applyOneTapMagic(_ image: UIImage, lumaHint: Double = 0.5) -> UIImage {
         guard let cgImage = image.cgImage else { return image }
         var current = CIImage(cgImage: cgImage)
 
-        let shadowLift = lumaHint < 0.35 ? 0.36 : 0.26
-        let highlightProtect = lumaHint > 0.72 ? 0.84 : 0.90
+        let shadowLift = lumaHint < 0.35 ? 0.36 : 0.28
+        let highlightProtect = lumaHint > 0.72 ? 0.82 : 0.88
         if let shadowHighlight = CIFilter(name: "CIHighlightShadowAdjust") {
             shadowHighlight.setValue(current, forKey: kCIInputImageKey)
             shadowHighlight.setValue(shadowLift, forKey: "inputShadowAmount")
@@ -90,27 +95,35 @@ enum PhotoEnhancerService {
 
         if let controls = CIFilter(name: "CIColorControls") {
             controls.setValue(current, forKey: kCIInputImageKey)
-            controls.setValue(1.06, forKey: kCIInputContrastKey)
+            controls.setValue(1.07, forKey: kCIInputContrastKey)
             controls.setValue(lumaHint < 0.32 ? 0.03 : 0.0, forKey: kCIInputBrightnessKey)
             if let out = controls.outputImage { current = out }
         }
 
         if let vibrance = CIFilter(name: "CIVibrance") {
             vibrance.setValue(current, forKey: kCIInputImageKey)
-            vibrance.setValue(0.18, forKey: "inputAmount")
+            vibrance.setValue(0.16, forKey: "inputAmount")
             if let out = vibrance.outputImage { current = out }
+        }
+
+        // Local micro-contrast clarity (crisp texture in eyes, hair, fabric, and architecture)
+        if let unsharp = CIFilter(name: "CIUnsharpMask") {
+            unsharp.setValue(current, forKey: kCIInputImageKey)
+            unsharp.setValue(2.2, forKey: kCIInputRadiusKey)
+            unsharp.setValue(0.45, forKey: kCIInputIntensityKey)
+            if let out = unsharp.outputImage { current = out }
         }
 
         if let sharpen = CIFilter(name: "CISharpenLuminance") {
             sharpen.setValue(current, forKey: kCIInputImageKey)
-            sharpen.setValue(0.50, forKey: kCIInputSharpnessKey)
+            sharpen.setValue(0.38, forKey: kCIInputSharpnessKey)
             if let out = sharpen.outputImage { current = out }
         }
 
         if let vignette = CIFilter(name: "CIVignette") {
             vignette.setValue(current, forKey: kCIInputImageKey)
-            vignette.setValue(0.28, forKey: kCIInputIntensityKey)
-            vignette.setValue(1.6, forKey: kCIInputRadiusKey)
+            vignette.setValue(0.18, forKey: kCIInputIntensityKey)
+            vignette.setValue(1.8, forKey: kCIInputRadiusKey)
             if let out = vignette.outputImage { current = out }
         }
 
