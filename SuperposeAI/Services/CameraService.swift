@@ -450,11 +450,12 @@ final class CameraService: NSObject {
             return try await capturePhoto()
         }
 
+        let bracketCount = expectedBracketCount
         return try await withCheckedThrowingContinuation { continuation in
             self.bracketContinuation = continuation
             sessionQueue.async { [weak self] in
                 guard let self else { return }
-                let biases: [Float] = [-1.0, 0.0, 1.0].prefix(self.expectedBracketCount).map { $0 }
+                let biases: [Float] = [-1.0, 0.0, 1.0].prefix(bracketCount).map { $0 }
                 let bracketSettings = biases.map {
                     AVCaptureAutoExposureBracketedStillImageSettings.autoExposureSettings(exposureTargetBias: $0)
                 }

@@ -47,12 +47,22 @@ enum PhotoEnhancerService {
     /// Develops a 12-bit/16-bit DNG RAW buffer on-device using Apple's `CIRAWFilter`
     /// with balanced highlight/shadow recovery and luminance noise reduction.
     static func developRAW(_ dngData: Data) -> UIImage? {
-        guard let rawFilter = CIRAWFilter(imageData: dngData) else { return nil }
-        rawFilter.boostAmount = 0.65
-        rawFilter.boostShadowAmount = 0.45
-        rawFilter.luminanceNoiseReductionAmount = 0.35
-        rawFilter.colorNoiseReductionAmount = 0.45
-        rawFilter.sharpnessAmount = 0.35
+        guard !dngData.isEmpty, let rawFilter = CIRAWFilter(imageData: dngData) else { return nil }
+        if rawFilter.responds(to: NSSelectorFromString("setBoostAmount:")) {
+            rawFilter.boostAmount = 0.65
+        }
+        if rawFilter.responds(to: NSSelectorFromString("setBoostShadowAmount:")) {
+            rawFilter.boostShadowAmount = 0.45
+        }
+        if rawFilter.responds(to: NSSelectorFromString("setLuminanceNoiseReductionAmount:")) {
+            rawFilter.luminanceNoiseReductionAmount = 0.35
+        }
+        if rawFilter.responds(to: NSSelectorFromString("setColorNoiseReductionAmount:")) {
+            rawFilter.colorNoiseReductionAmount = 0.45
+        }
+        if rawFilter.responds(to: NSSelectorFromString("setSharpnessAmount:")) {
+            rawFilter.sharpnessAmount = 0.35
+        }
 
         guard var ciImage = rawFilter.outputImage else { return nil }
         if let shadowHighlight = CIFilter(name: "CIHighlightShadowAdjust") {
