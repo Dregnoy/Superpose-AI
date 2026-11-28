@@ -60,14 +60,43 @@ extension CameraView {
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
 
-                monochromeToggleButton
-                zenToggleButton
+                if isProMode {
+                    monochromeToggleButton
+                }
+                proModePillButton
+                if isProMode {
+                    zenToggleButton
+                }
             }
 
-            if !appState.isOneHandedMode {
+            if !appState.isOneHandedMode && (isProMode || appState.pinnedPose != nil) {
                 quickPoseAndGuideRow
             }
         }
+    }
+
+    var proModePillButton: some View {
+        Button {
+            withAnimation(.spring(response: 0.25, dampingFraction: 0.85)) {
+                isProMode.toggle()
+                showToolsDrawer = isProMode
+                if !isProMode {
+                    isFocusPeakingEnabled = false
+                    isMonochromePreview = false
+                    isZenMode = false
+                    cameraService.resetProControls()
+                }
+            }
+            showToast(isProMode ? "Pro Mod Açık" : "Basit Mod")
+        } label: {
+            Text("PRO")
+                .font(.caption2.bold())
+                .foregroundStyle(isProMode ? .black : .white)
+                .padding(.horizontal, 9)
+                .padding(.vertical, 6)
+                .background(isProMode ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+        }
+        .accessibilityLabel(isProMode ? "Basit Moda Geç" : "Pro Modu Aç")
     }
 
     var monochromeToggleButton: some View {
@@ -488,29 +517,42 @@ extension CameraView {
                 }
             }
 
-            // Compact Tools Drawer Toggle + Foto / Video (Reels) switch + 4K Video Quality Pill
+            // Simple Mode: Flash + Foto/Video + Timer (+ Tools Drawer only in Pro Mode)
             HStack(spacing: 8) {
                 Button {
-                    withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
-                        showToolsDrawer.toggle()
-                    }
+                    cameraService.toggleFlash()
                 } label: {
-                    HStack(spacing: 4) {
-                        Image(systemName: showToolsDrawer ? "chevron.down" : "chevron.up")
-                        Text("Araçlar")
-                        if hasActiveDrawerTools && !showToolsDrawer {
-                            Circle()
-                                .fill(Color.cyan)
-                                .frame(width: 6, height: 6)
-                        }
-                    }
-                    .font(.caption2.bold())
-                    .foregroundStyle(showToolsDrawer ? .black : .white)
-                    .padding(.horizontal, 10)
-                    .padding(.vertical, 7)
-                    .background(showToolsDrawer ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                    Image(systemName: cameraService.flashMode == .on ? "bolt.fill" : (cameraService.flashMode == .auto ? "bolt.badge.a.fill" : "bolt.slash"))
+                        .font(.caption)
+                        .foregroundStyle(cameraService.flashMode == .on ? .yellow : .white)
+                        .frame(width: 32, height: 32)
+                        .background(.ultraThinMaterial, in: Circle())
                 }
                 .buttonStyle(.plain)
+
+                if isProMode {
+                    Button {
+                        withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
+                            showToolsDrawer.toggle()
+                        }
+                    } label: {
+                        HStack(spacing: 4) {
+                            Image(systemName: showToolsDrawer ? "chevron.down" : "chevron.up")
+                            Text("Araçlar")
+                            if hasActiveDrawerTools && !showToolsDrawer {
+                                Circle()
+                                    .fill(Color.cyan)
+                                    .frame(width: 6, height: 6)
+                            }
+                        }
+                        .font(.caption2.bold())
+                        .foregroundStyle(showToolsDrawer ? .black : .white)
+                        .padding(.horizontal, 10)
+                        .padding(.vertical, 7)
+                        .background(showToolsDrawer ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
 
                 HStack(spacing: 4) {
                     Button {
@@ -552,6 +594,23 @@ extension CameraView {
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
                             .background(cameraService.is4KVideoEnabled ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                } else {
+                    Button {
+                        timerSeconds = (timerSeconds == 0) ? 3 : (timerSeconds == 3 ? 10 : 0)
+                    } label: {
+                        HStack(spacing: 2) {
+                            Image(systemName: "timer")
+                            if timerSeconds > 0 {
+                                Text("\(timerSeconds)s")
+                            }
+                        }
+                        .font(.caption2.bold())
+                        .foregroundStyle(timerSeconds > 0 ? .black : .white)
+                        .padding(.horizontal, timerSeconds > 0 ? 8 : 0)
+                        .frame(minWidth: 32, minHeight: 32)
+                        .background(timerSeconds > 0 ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
                     }
                     .buttonStyle(.plain)
                 }
@@ -839,45 +898,47 @@ extension CameraView {
                         .background(.ultraThinMaterial, in: Circle())
                 }
 
-                Button {
-                    appState.isVoiceCoachEnabled.toggle()
-                    if appState.isVoiceCoachEnabled {
-                        voiceCoach.speak("Sesli koç açık")
-                        showToast("Sesli koç açık")
-                    } else {
-                        voiceCoach.stop()
-                        showToast("Sesli koç kapalı")
+                if isProMode {
+                    Button {
+                        appState.isVoiceCoachEnabled.toggle()
+                        if appState.isVoiceCoachEnabled {
+                            voiceCoach.speak("Sesli koç açık")
+                            showToast("Sesli koç açık")
+                        } else {
+                            voiceCoach.stop()
+                            showToast("Sesli koç kapalı")
+                        }
+                    } label: {
+                        Image(systemName: appState.isVoiceCoachEnabled ? "speaker.wave.2.fill" : "speaker.slash")
+                            .font(.caption)
+                            .foregroundStyle(appState.isVoiceCoachEnabled ? .cyan : .white)
+                            .frame(width: 30, height: 30)
+                            .background(.ultraThinMaterial, in: Circle())
                     }
-                } label: {
-                    Image(systemName: appState.isVoiceCoachEnabled ? "speaker.wave.2.fill" : "speaker.slash")
-                        .font(.caption)
-                        .foregroundStyle(appState.isVoiceCoachEnabled ? .cyan : .white)
-                        .frame(width: 30, height: 30)
-                        .background(.ultraThinMaterial, in: Circle())
-                }
 
-                Button {
-                    appState.isAutoShutterEnabled.toggle()
-                    if !appState.isAutoShutterEnabled {
-                        autoShutterTask?.cancel()
-                        autoShutterCountdown = nil
+                    Button {
+                        appState.isAutoShutterEnabled.toggle()
+                        if !appState.isAutoShutterEnabled {
+                            autoShutterTask?.cancel()
+                            autoShutterCountdown = nil
+                        }
+                    } label: {
+                        Text("OTO")
+                            .font(.system(size: 10, weight: .bold))
+                            .foregroundStyle(appState.isAutoShutterEnabled ? .black : .white)
+                            .frame(width: 34, height: 30)
+                            .background(appState.isAutoShutterEnabled ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
                     }
-                } label: {
-                    Text("OTO")
-                        .font(.system(size: 10, weight: .bold))
-                        .foregroundStyle(appState.isAutoShutterEnabled ? .black : .white)
-                        .frame(width: 34, height: 30)
-                        .background(appState.isAutoShutterEnabled ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
-                }
 
-                Button {
-                    cycleGridMode()
-                } label: {
-                    Image(systemName: "grid")
-                        .font(.caption)
-                        .foregroundStyle(appState.gridMode != .off ? .cyan : .white)
-                        .frame(width: 30, height: 30)
-                        .background(.ultraThinMaterial, in: Circle())
+                    Button {
+                        cycleGridMode()
+                    } label: {
+                        Image(systemName: "grid")
+                            .font(.caption)
+                            .foregroundStyle(appState.gridMode != .off ? .cyan : .white)
+                            .frame(width: 30, height: 30)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
                 }
 
                 Button {
@@ -890,14 +951,16 @@ extension CameraView {
                         .background(timerSeconds > 0 ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
                 }
 
-                Button {
-                    isBurstEnabled.toggle()
-                } label: {
-                    Image(systemName: "square.stack.3d.down.right")
-                        .font(.caption)
-                        .foregroundStyle(isBurstEnabled ? .black : .white)
-                        .frame(width: 30, height: 30)
-                        .background(isBurstEnabled ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
+                if isProMode {
+                    Button {
+                        isBurstEnabled.toggle()
+                    } label: {
+                        Image(systemName: "square.stack.3d.down.right")
+                            .font(.caption)
+                            .foregroundStyle(isBurstEnabled ? .black : .white)
+                            .frame(width: 30, height: 30)
+                            .background(isBurstEnabled ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
+                    }
                 }
             }
 
