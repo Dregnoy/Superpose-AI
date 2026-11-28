@@ -23,7 +23,7 @@ final class CameraService: NSObject, CameraServicing {
 
     nonisolated let session = AVCaptureSession()
     var cameraPosition: AVCaptureDevice.Position = .back
-    var flashMode: AVCaptureDevice.FlashMode = .off
+    var flashMode: AVCaptureDevice.FlashMode = .auto
     var zoomFactor: CGFloat = 1.0
     var authorizationStatus: AVAuthorizationStatus = AVCaptureDevice.authorizationStatus(for: .video)
     var lastError: CameraError?
@@ -351,7 +351,12 @@ final class CameraService: NSObject, CameraServicing {
     }
 
     func toggleFlash() {
-        flashMode = (flashMode == .off) ? .on : .off
+        switch flashMode {
+        case .auto: flashMode = .on
+        case .on: flashMode = .off
+        case .off: flashMode = .auto
+        @unknown default: flashMode = .auto
+        }
     }
 
     func updateOrientation(to interfaceOrientation: UIInterfaceOrientation) {
@@ -463,8 +468,15 @@ final class CameraService: NSObject, CameraServicing {
                         settings = AVCapturePhotoSettings()
                     }
                 } else {
-                    settings = AVCapturePhotoSettings()
+                    if self.photoOutput.availablePhotoCodecTypes.contains(.hevc) {
+                        settings = AVCapturePhotoSettings(format: [AVVideoCodecKey: AVVideoCodecType.hevc])
+                    } else {
+                        settings = AVCapturePhotoSettings()
+                    }
                     settings.photoQualityPrioritization = .quality
+                }
+                if self.photoOutput.isAutoRedEyeReductionSupported {
+                    settings.isAutoRedEyeReductionEnabled = true
                 }
                 if self.photoOutput.supportedFlashModes.contains(flash) {
                     settings.flashMode = flash
@@ -506,6 +518,7 @@ final class CameraService: NSObject, CameraServicing {
     nonisolated private func configureSession(position: AVCaptureDevice.Position) {
         session.beginConfiguration()
         session.sessionPreset = .photo
+        session.automaticallyConfiguresCaptureDeviceForWideColor = true
 
         if let currentInput = sessionState.currentInput {
             session.removeInput(currentInput)
@@ -562,6 +575,12 @@ final class CameraService: NSObject, CameraServicing {
             session.addOutput(photoOutput)
         }
         photoOutput.maxPhotoQualityPrioritization = .quality
+        if photoOutput.isAutoVirtualDeviceFusionSupported {
+            photoOutput.isAutoVirtualDeviceFusionEnabled = true
+        }
+        if photoOutput.isResponsiveCaptureSupported {
+            photoOutput.isResponsiveCaptureEnabled = true
+        }
 
         if !session.outputs.contains(movieOutput), session.canAddOutput(movieOutput) {
             session.addOutput(movieOutput)

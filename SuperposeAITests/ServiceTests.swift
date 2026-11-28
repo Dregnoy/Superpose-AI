@@ -19,12 +19,14 @@ struct ServiceTests {
     func cameraServiceStateToggles() {
         let service = CameraService()
         #expect(service.cameraPosition == .back)
-        #expect(service.flashMode == .off)
+        #expect(service.flashMode == .auto)
 
         service.toggleFlash()
         #expect(service.flashMode == .on)
         service.toggleFlash()
         #expect(service.flashMode == .off)
+        service.toggleFlash()
+        #expect(service.flashMode == .auto)
 
         service.zoomFactor = 2.0
         service.toggleCamera()

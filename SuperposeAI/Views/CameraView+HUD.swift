@@ -334,7 +334,7 @@ extension CameraView {
                 Button {
                     cameraService.toggleFlash()
                 } label: {
-                    Image(systemName: cameraService.flashMode == .on ? "bolt.fill" : "bolt.slash")
+                    Image(systemName: cameraService.flashMode == .on ? "bolt.fill" : (cameraService.flashMode == .auto ? "bolt.badge.a.fill" : "bolt.slash"))
                         .font(.subheadline)
                         .frame(width: 34, height: 34)
                         .background(.ultraThinMaterial, in: Circle())
@@ -833,7 +833,7 @@ extension CameraView {
                 Button {
                     cameraService.toggleFlash()
                 } label: {
-                    Image(systemName: cameraService.flashMode == .on ? "bolt.fill" : "bolt.slash")
+                    Image(systemName: cameraService.flashMode == .on ? "bolt.fill" : (cameraService.flashMode == .auto ? "bolt.badge.a.fill" : "bolt.slash"))
                         .font(.caption)
                         .frame(width: 30, height: 30)
                         .background(.ultraThinMaterial, in: Circle())

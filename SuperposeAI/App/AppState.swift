@@ -110,7 +110,7 @@ final class AppState {
         }
         self.autoSaveToApplePhotos = UserDefaults.standard.bool(forKey: "autoSaveToApplePhotos")
         if UserDefaults.standard.object(forKey: "autoEnhancePhotos") == nil {
-            self.autoEnhancePhotos = true
+            self.autoEnhancePhotos = false
         } else {
             self.autoEnhancePhotos = UserDefaults.standard.bool(forKey: "autoEnhancePhotos")
         }
