@@ -19,10 +19,18 @@ final class SuperposeAIUITests: XCTestCase {
     func testMainTabBarNavigation() throws {
         let app = XCUIApplication()
         app.launchArguments = ["-UITestingSkipOnboarding"]
+        addUIInterruptionMonitor(withDescription: "System Permission Dialog") { alert in
+            let allowButtons = ["OK", "Allow", "İzin Ver"]
+            for title in allowButtons where alert.buttons[title].exists {
+                alert.buttons[title].tap()
+                return true
+            }
+            return false
+        }
         app.launch()
 
         let tabBar = app.tabBars.firstMatch
-        XCTAssertTrue(tabBar.waitForExistence(timeout: 5))
+        XCTAssertTrue(tabBar.waitForExistence(timeout: 8))
 
         let libraryTab = tabBar.buttons["Kütüphane"]
         XCTAssertTrue(libraryTab.exists)

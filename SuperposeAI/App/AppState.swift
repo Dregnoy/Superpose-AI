@@ -94,7 +94,14 @@ final class AppState {
     }
 
     init() {
-        self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+        let args = ProcessInfo.processInfo.arguments
+        if args.contains("-UITestingSkipOnboarding") {
+            self.hasCompletedOnboarding = true
+        } else if args.contains("-UITestingResetOnboarding") {
+            self.hasCompletedOnboarding = false
+        } else {
+            self.hasCompletedOnboarding = UserDefaults.standard.bool(forKey: "hasCompletedOnboarding")
+        }
         if let saved = UserDefaults.standard.string(forKey: "preferredUseCase"),
            let parsed = PoseUseCase(rawValue: saved) {
             self.preferredUseCase = parsed
