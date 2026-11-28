@@ -34,16 +34,34 @@ final class CameraService: NSObject {
     var isAppleProRAWSupported = false
     var isHDRBracketingEnabled = false
 
+    private final class SessionQueueState: @unchecked Sendable {
+        private let lock = NSLock()
+        private var _currentInput: AVCaptureDeviceInput?
+        private var _isFocusLockedByUser = false
+        private var _subjectAreaObserver: NSObjectProtocol?
+
+        var currentInput: AVCaptureDeviceInput? {
+            get { lock.withLock { _currentInput } }
+            set { lock.withLock { _currentInput = newValue } }
+        }
+
+        var isFocusLockedByUser: Bool {
+            get { lock.withLock { _isFocusLockedByUser } }
+            set { lock.withLock { _isFocusLockedByUser = newValue } }
+        }
+
+        var subjectAreaObserver: NSObjectProtocol? {
+            get { lock.withLock { _subjectAreaObserver } }
+            set { lock.withLock { _subjectAreaObserver = newValue } }
+        }
+    }
+
     @ObservationIgnored nonisolated private let sessionQueue = DispatchQueue(label: "com.superposelabs.camera.session")
     @ObservationIgnored nonisolated private let videoQueue = DispatchQueue(label: "com.superposelabs.camera.video")
     @ObservationIgnored nonisolated private let videoOutput = AVCaptureVideoDataOutput()
     @ObservationIgnored nonisolated private let photoOutput = AVCapturePhotoOutput()
     @ObservationIgnored nonisolated private let movieOutput = AVCaptureMovieFileOutput()
-    @ObservationIgnored nonisolated(unsafe) private var currentInput: AVCaptureDeviceInput?
-    @ObservationIgnored nonisolated(unsafe) private var currentPosition: AVCaptureDevice.Position = .back
-    @ObservationIgnored nonisolated(unsafe) private var currentFlashMode: AVCaptureDevice.FlashMode = .off
-    @ObservationIgnored nonisolated(unsafe) private var isFocusLockedByUser: Bool = false
-    @ObservationIgnored nonisolated(unsafe) private var subjectAreaObserver: NSObjectProtocol?
+    @ObservationIgnored nonisolated private let sessionState = SessionQueueState()
     @ObservationIgnored private var lastFaceFocusTime: CFAbsoluteTime = 0
     @ObservationIgnored private var lastFaceFocusCenter: CGPoint = .zero
     @ObservationIgnored private var photoContinuation: CheckedContinuation<(UIImage, Data?), Error>?
@@ -76,7 +94,6 @@ final class CameraService: NSObject {
 
     func startSession() {
         let position = cameraPosition
-        currentPosition = position
         sessionQueue.async { [weak self] in
             guard let self else { return }
             if !self.session.inputs.isEmpty {
@@ -104,7 +121,6 @@ final class CameraService: NSObject {
     func toggleCamera() {
         let nextPosition: AVCaptureDevice.Position = (cameraPosition == .back) ? .front : .back
         cameraPosition = nextPosition
-        currentPosition = nextPosition
         zoomFactor = 1.0
         sessionQueue.async { [weak self] in
             self?.configureSession(position: nextPosition)
@@ -114,7 +130,7 @@ final class CameraService: NSObject {
     func setZoom(_ factor: CGFloat) {
         zoomFactor = factor
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device else { return }
+            guard let self, let device = self.sessionState.currentInput?.device else { return }
             do {
                 try device.lockForConfiguration()
                 let clamped = max(device.minAvailableVideoZoomFactor, min(factor, min(device.maxAvailableVideoZoomFactor, 5.0)))
@@ -128,8 +144,8 @@ final class CameraService: NSObject {
 
     func focusAndExpose(at normalizedPoint: CGPoint, lock: Bool = false) {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device else { return }
-            self.isFocusLockedByUser = lock
+            guard let self, let device = self.sessionState.currentInput?.device else { return }
+            self.sessionState.isFocusLockedByUser = lock
             do {
                 try device.lockForConfiguration()
                 device.isSubjectAreaChangeMonitoringEnabled = !lock
@@ -174,7 +190,7 @@ final class CameraService: NSObject {
     }
 
     func trackFaceFocusIfUnlocked(normalizedFaceBox: CGRect, isProMode: Bool) {
-        guard !isProMode, !isFocusLockedByUser else { return }
+        guard !isProMode, !sessionState.isFocusLockedByUser else { return }
         let now = CFAbsoluteTimeGetCurrent()
         guard now - lastFaceFocusTime >= 0.8 else { return }
 
@@ -189,7 +205,7 @@ final class CameraService: NSObject {
         )
 
         sessionQueue.async { [weak self] in
-            guard let self, !self.isFocusLockedByUser, let device = self.currentInput?.device else { return }
+            guard let self, !self.sessionState.isFocusLockedByUser, let device = self.sessionState.currentInput?.device else { return }
             do {
                 try device.lockForConfiguration()
                 if device.isFocusPointOfInterestSupported {
@@ -211,7 +227,7 @@ final class CameraService: NSObject {
 
     func setManualFocus(_ lensPosition: Float) {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device,
+            guard let self, let device = self.sessionState.currentInput?.device,
                   device.isLockingFocusWithCustomLensPositionSupported else { return }
             do {
                 try device.lockForConfiguration()
@@ -224,7 +240,7 @@ final class CameraService: NSObject {
 
     func setManualISO(_ isoNormalized: Float) {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device else { return }
+            guard let self, let device = self.sessionState.currentInput?.device else { return }
             do {
                 try device.lockForConfiguration()
                 let minISO = device.activeFormat.minISO
@@ -238,7 +254,7 @@ final class CameraService: NSObject {
 
     func setManualShutter(seconds: Double) {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device else { return }
+            guard let self, let device = self.sessionState.currentInput?.device else { return }
             do {
                 try device.lockForConfiguration()
                 let minDur = device.activeFormat.minExposureDuration
@@ -253,7 +269,7 @@ final class CameraService: NSObject {
 
     func setManualExposure(isoNormalized: Float, shutterSeconds: Double) {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device else { return }
+            guard let self, let device = self.sessionState.currentInput?.device else { return }
             do {
                 try device.lockForConfiguration()
                 let minISO = device.activeFormat.minISO
@@ -271,7 +287,7 @@ final class CameraService: NSObject {
 
     func setWhiteBalanceKelvin(_ kelvin: Float) {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device,
+            guard let self, let device = self.sessionState.currentInput?.device,
                   device.isLockingWhiteBalanceWithCustomDeviceGainsSupported else { return }
             do {
                 try device.lockForConfiguration()
@@ -289,7 +305,7 @@ final class CameraService: NSObject {
 
     func resetProControls() {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device else { return }
+            guard let self, let device = self.sessionState.currentInput?.device else { return }
             do {
                 try device.lockForConfiguration()
                 if device.isFocusModeSupported(.continuousAutoFocus) { device.focusMode = .continuousAutoFocus }
@@ -303,7 +319,7 @@ final class CameraService: NSObject {
 
     func setExposureBias(_ bias: Float) {
         sessionQueue.async { [weak self] in
-            guard let self, let device = self.currentInput?.device else { return }
+            guard let self, let device = self.sessionState.currentInput?.device else { return }
             do {
                 try device.lockForConfiguration()
                 let clamped = max(device.minExposureTargetBias, min(bias, device.maxExposureTargetBias))
@@ -317,7 +333,6 @@ final class CameraService: NSObject {
 
     func toggleFlash() {
         flashMode = (flashMode == .off) ? .on : .off
-        currentFlashMode = flashMode
     }
 
     func updateOrientation(to interfaceOrientation: UIInterfaceOrientation) {
@@ -407,7 +422,6 @@ final class CameraService: NSObject {
     func capturePhotoWithRAW(preferRAW: Bool) async throws -> (UIImage, Data?) {
         let flash = flashMode
         let wantRAW = preferRAW && isRAWEnabled
-        currentFlashMode = flash
         pendingProcessedImage = nil
         pendingRawDNGData = nil
         pendingPhotoError = nil
@@ -473,9 +487,9 @@ final class CameraService: NSObject {
         session.beginConfiguration()
         session.sessionPreset = .photo
 
-        if let currentInput {
+        if let currentInput = sessionState.currentInput {
             session.removeInput(currentInput)
-            self.currentInput = nil
+            sessionState.currentInput = nil
         }
 
         guard let device = AVCaptureDevice.default(.builtInWideAngleCamera, for: .video, position: position),
@@ -487,18 +501,18 @@ final class CameraService: NSObject {
         }
 
         session.addInput(input)
-        currentInput = input
-        isFocusLockedByUser = false
+        sessionState.currentInput = input
+        sessionState.isFocusLockedByUser = false
         enableContinuousAutoFocus(on: device)
 
-        if subjectAreaObserver == nil {
-            subjectAreaObserver = NotificationCenter.default.addObserver(
+        if sessionState.subjectAreaObserver == nil {
+            sessionState.subjectAreaObserver = NotificationCenter.default.addObserver(
                 forName: AVCaptureDevice.subjectAreaDidChangeNotification,
                 object: nil,
                 queue: nil
             ) { [weak self] _ in
                 self?.sessionQueue.async { [weak self] in
-                    guard let self, !self.isFocusLockedByUser, let activeDevice = self.currentInput?.device else { return }
+                    guard let self, !self.sessionState.isFocusLockedByUser, let activeDevice = self.sessionState.currentInput?.device else { return }
                     self.enableContinuousAutoFocus(on: activeDevice)
                 }
             }
