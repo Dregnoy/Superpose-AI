@@ -49,6 +49,7 @@ struct CameraView: View {
     @State var previewingLatestItem: LibraryItem?
     @State var showPoseTemplates: Bool = false
     @State var selectedLook: PhotoLookPreset = .natural
+    @State var isOneTapMagicEnabled: Bool = true
 
     let poseGenerator = AIPoseGeneratorService()
 

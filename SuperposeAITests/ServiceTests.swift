@@ -166,4 +166,27 @@ struct ServiceTests {
         #expect(templates.count >= 4)
         #expect(templates.contains(where: { $0.category == .couples }))
     }
+
+    @Test("ShootingMetricsStore tracks shots, aesthetic average, and shares")
+    @MainActor
+    func shootingMetricsTracking() throws {
+        let suiteName = "com.superposelabs.tests.\(UUID().uuidString)"
+        let defaults = try #require(UserDefaults(suiteName: suiteName))
+        let metrics = ShootingMetricsStore(defaults: defaults)
+
+        metrics.recordShot(aestheticScore: 80.0, usedMagic: true, poseMatchScore: 90)
+        metrics.recordShot(aestheticScore: 90.0, usedMagic: false, poseMatchScore: 70)
+        metrics.recordShare()
+
+        #expect(metrics.totalShotsCaptured == 2)
+        #expect(metrics.magicEnhancedShots == 1)
+        #expect(metrics.poseMatchesAchieved == 1)
+        #expect(metrics.totalShares == 1)
+        #expect(metrics.bestAestheticScore == 90.0)
+        #expect(metrics.averageAestheticScore == 85.0)
+
+        metrics.reset()
+        #expect(metrics.totalShotsCaptured == 0)
+        defaults.removePersistentDomain(forName: suiteName)
+    }
 }

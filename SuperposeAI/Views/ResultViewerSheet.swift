@@ -45,6 +45,9 @@ struct ResultViewerSheet: View {
     @State private var exposureAdjust: Double = 0.0
     @State private var warmthAdjust: Double = 0.0
     @State private var enhancedCache: UIImage?
+    @State private var isMagicApplied = false
+    @State private var magicCache: UIImage?
+    @State private var aestheticReport: AestheticScoreReport?
 
     private static let sharedCIContext = PhotoEnhancerService.context
 
@@ -128,6 +131,32 @@ struct ResultViewerSheet: View {
 
                 // Minimal 3-tone selector + Shot Summary + AI/CoreImage suggestion
                 VStack(spacing: 6) {
+                    HStack(spacing: 8) {
+                        Button {
+                            if !isMagicApplied, magicCache == nil, let original = libraryStore.image(for: item) {
+                                magicCache = PhotoEnhancerService.applyOneTapMagic(original)
+                            }
+                            isMagicApplied.toggle()
+                        } label: {
+                            Label(isMagicApplied ? "Sihir Uygulandı" : "Tek Dokunuşla Sihir", systemImage: "wand.and.stars")
+                                .font(.caption.bold())
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 7)
+                                .background(isMagicApplied ? Color.cyan : Color.yellow, in: Capsule())
+                                .foregroundStyle(.black)
+                        }
+                        .buttonStyle(.plain)
+
+                        if let report = aestheticReport {
+                            Label("Estetik \(report.outOfTenText) • \(report.verdict)", systemImage: report.usedCoreMLModel ? "cpu" : "sparkles")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 10)
+                                .padding(.vertical, 7)
+                                .background(.ultraThinMaterial, in: Capsule())
+                                .foregroundStyle(.cyan)
+                        }
+                    }
+
                     if let summary = shotSummaryText() {
                         Text(summary)
                             .font(.caption2)
@@ -292,6 +321,26 @@ struct ResultViewerSheet: View {
                                 .background(Color.white.opacity(0.12), in: RoundedRectangle(cornerRadius: 12))
                                 .foregroundStyle(.white)
                         }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            ShootingMetricsStore.shared.recordShare()
+                        })
+                    }
+
+                    if let storyCard = buildStoryCardImage() {
+                        ShareLink(
+                            item: Image(uiImage: storyCard),
+                            preview: SharePreview("Superpose Hikâye Kartı", image: Image(uiImage: storyCard))
+                        ) {
+                            Label("Kart", systemImage: "rectangle.portrait.on.rectangle.portrait.angled")
+                                .font(.caption.bold())
+                                .padding(.horizontal, 12)
+                                .padding(.vertical, 12)
+                                .background(Color.purple.opacity(0.35), in: RoundedRectangle(cornerRadius: 12))
+                                .foregroundStyle(.white)
+                        }
+                        .simultaneousGesture(TapGesture().onEnded {
+                            ShootingMetricsStore.shared.recordShare()
+                        })
                     }
                 }
                 .padding(.horizontal)
@@ -322,14 +371,30 @@ struct ResultViewerSheet: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
                 enhancedCache = nil
+                magicCache = nil
                 bokehBaseImage = nil
                 isApplyingBokeh = false
+            }
+            .task {
+                if aestheticReport == nil, let img = libraryStore.image(for: item) {
+                    aestheticReport = AestheticScoringService.evaluate(image: img)
+                }
             }
         }
     }
 
     private var hasBeforePhoto: Bool {
         libraryStore.items.count > 1
+    }
+
+    @MainActor
+    private func buildStoryCardImage() -> UIImage? {
+        guard let photo = styledImage() else { return nil }
+        return ShareCardRenderer.renderStoryCard(
+            photo: photo,
+            aestheticReport: aestheticReport,
+            poseTitle: item.poseIdea?.title
+        )
     }
 
     @MainActor
@@ -374,7 +439,9 @@ struct ResultViewerSheet: View {
 
     private func styledImage() -> UIImage? {
         var baseImage: UIImage? = isPortraitBokeh ? (bokehBaseImage ?? libraryStore.image(for: item)) : libraryStore.image(for: item)
-        if isNaturalEnhanced {
+        if isMagicApplied {
+            baseImage = magicCache ?? baseImage.map { PhotoEnhancerService.applyOneTapMagic($0) }
+        } else if isNaturalEnhanced {
             baseImage = enhancedCache ?? baseImage.map { PhotoEnhancerService.naturalizeAndSharpen($0) }
         }
         guard let base = baseImage else { return nil }

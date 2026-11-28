@@ -543,6 +543,18 @@ extension CameraView {
                     .buttonStyle(.plain)
 
                     Button {
+                        isOneTapMagicEnabled.toggle()
+                        showToast(isOneTapMagicEnabled ? "Tek Vuruşluk Sihir açık" : "Tek Vuruşluk Sihir kapalı")
+                    } label: {
+                        Image(systemName: "wand.and.stars")
+                            .font(.caption)
+                            .foregroundStyle(isOneTapMagicEnabled ? .black : .white)
+                            .frame(width: 32, height: 32)
+                            .background(isOneTapMagicEnabled ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
                         selectedLook = selectedLook.next
                         showToast("Stil: \(selectedLook.rawValue)")
                     } label: {

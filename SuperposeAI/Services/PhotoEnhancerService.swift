@@ -73,6 +73,53 @@ enum PhotoEnhancerService {
         return UIImage(cgImage: outputCG, scale: image.scale, orientation: image.imageOrientation)
     }
 
+    /// One-Tap Magic ("Tek Vuruşluk Büyü"): balances dynamic range, micro-contrast,
+    /// skin-safe vibrance, luminance crispness, and a subtle studio vignette on-device.
+    static func applyOneTapMagic(_ image: UIImage, lumaHint: Double = 0.5) -> UIImage {
+        guard let cgImage = image.cgImage else { return image }
+        var current = CIImage(cgImage: cgImage)
+
+        let shadowLift = lumaHint < 0.35 ? 0.36 : 0.26
+        let highlightProtect = lumaHint > 0.72 ? 0.84 : 0.90
+        if let shadowHighlight = CIFilter(name: "CIHighlightShadowAdjust") {
+            shadowHighlight.setValue(current, forKey: kCIInputImageKey)
+            shadowHighlight.setValue(shadowLift, forKey: "inputShadowAmount")
+            shadowHighlight.setValue(highlightProtect, forKey: "inputHighlightAmount")
+            if let out = shadowHighlight.outputImage { current = out }
+        }
+
+        if let controls = CIFilter(name: "CIColorControls") {
+            controls.setValue(current, forKey: kCIInputImageKey)
+            controls.setValue(1.06, forKey: kCIInputContrastKey)
+            controls.setValue(lumaHint < 0.32 ? 0.03 : 0.0, forKey: kCIInputBrightnessKey)
+            if let out = controls.outputImage { current = out }
+        }
+
+        if let vibrance = CIFilter(name: "CIVibrance") {
+            vibrance.setValue(current, forKey: kCIInputImageKey)
+            vibrance.setValue(0.18, forKey: "inputAmount")
+            if let out = vibrance.outputImage { current = out }
+        }
+
+        if let sharpen = CIFilter(name: "CISharpenLuminance") {
+            sharpen.setValue(current, forKey: kCIInputImageKey)
+            sharpen.setValue(0.50, forKey: kCIInputSharpnessKey)
+            if let out = sharpen.outputImage { current = out }
+        }
+
+        if let vignette = CIFilter(name: "CIVignette") {
+            vignette.setValue(current, forKey: kCIInputImageKey)
+            vignette.setValue(0.28, forKey: kCIInputIntensityKey)
+            vignette.setValue(1.6, forKey: kCIInputRadiusKey)
+            if let out = vignette.outputImage { current = out }
+        }
+
+        guard let outputCG = context.createCGImage(current, from: current.extent) else {
+            return image
+        }
+        return UIImage(cgImage: outputCG, scale: image.scale, orientation: image.imageOrientation)
+    }
+
     static func naturalizeAndSharpen(_ image: UIImage) -> UIImage {
         guard let cgImage = image.cgImage else { return image }
         var current = CIImage(cgImage: cgImage)

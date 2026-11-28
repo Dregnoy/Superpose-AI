@@ -85,7 +85,10 @@ extension CameraView {
                     developedImage = rawDeveloped
                 } else {
                     let baseImage = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(image) : image
-                    developedImage = PhotoEnhancerService.applyLook(selectedLook, to: baseImage)
+                    let magicImage = isOneTapMagicEnabled
+                        ? PhotoEnhancerService.applyOneTapMagic(baseImage, lumaHint: visionService.guidance.lumaScore)
+                        : baseImage
+                    developedImage = PhotoEnhancerService.applyLook(selectedLook, to: magicImage)
                 }
                 let pinned = appState.pinnedPose
                 let savedID = libraryStore.saveCapturedPhoto(
@@ -100,6 +103,16 @@ extension CameraView {
                     let quality = await visionService.evaluateShotQuality(image: developedImage, targetPose: pinned)
                     libraryStore.updateQualityScore(id: savedID, score: quality.totalScore)
                 }
+                let aesthetic = AestheticScoringService.evaluate(
+                    image: developedImage,
+                    poseMatchScore: visionService.guidance.poseMatchScore,
+                    subjectCenter: visionService.guidance.detectedFaceBox.map { CGPoint(x: $0.midX, y: $0.midY) }
+                )
+                ShootingMetricsStore.shared.recordShot(
+                    aestheticScore: aesthetic.overallScore,
+                    usedMagic: isOneTapMagicEnabled,
+                    poseMatchScore: visionService.guidance.poseMatchScore
+                )
                 var rawSaved = false
                 if let rawDNGData {
                     rawSaved = await libraryStore.saveRAWToApplePhotos(rawDNGData)

@@ -181,4 +181,24 @@ struct PoseVisionTests {
         let hint = PoseVisionService.evaluateCouplesBalance(first: leftPerson, second: rightPerson)
         #expect(hint?.contains("birbirinize") == true)
     }
+
+    @Test("AestheticScoringService and One-Tap Magic preserve valid ranges and dimensions")
+    func aestheticAndOneTapMagic() {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64))
+        let sample = renderer.image { ctx in
+            UIColor.systemGray.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+        }
+        let magic = PhotoEnhancerService.applyOneTapMagic(sample, lumaHint: 0.30)
+        #expect(magic.size.width == 64)
+        #expect(magic.size.height == 64)
+
+        let report = AestheticScoringService.evaluate(image: magic, poseMatchScore: 88, subjectCenter: CGPoint(x: 0.33, y: 0.33))
+        #expect(report.overallScore >= 0 && report.overallScore <= 100)
+        #expect(report.outOfTenText.contains("/10"))
+
+        let storyCard = ShareCardRenderer.renderStoryCard(photo: magic, aestheticReport: report, poseTitle: "Test Pozu")
+        #expect(storyCard.size.width == 1080)
+        #expect(storyCard.size.height == 1920)
+    }
 }

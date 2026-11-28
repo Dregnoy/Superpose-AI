@@ -44,6 +44,12 @@ struct LibraryView: View {
                     )
                 } else {
                     ScrollView {
+                        if ShootingMetricsStore.shared.totalShotsCaptured > 0 {
+                            shootingScorecard
+                                .padding(.horizontal)
+                                .padding(.top, 6)
+                        }
+
                         Picker("Filtre", selection: $libraryFilter) {
                             ForEach(LibraryFilter.allCases) { f in
                                 Text(f.rawValue).tag(f)
@@ -449,5 +455,29 @@ struct LibraryView: View {
         isMultiSelectMode = false
         viewingItem = libraryStore.items.first(where: { $0.id == winner.id }) ?? winner
         poseExtractAlert = "En net, keskin ve uyumlu kare favori olarak seçildi (Skor: %\(Int(best.1.rounded())))."
+    }
+
+    private var shootingScorecard: some View {
+        let metrics = ShootingMetricsStore.shared
+        return HStack(spacing: 10) {
+            scorecardCell(title: "Çekim", value: "\(metrics.totalShotsCaptured)")
+            scorecardCell(title: "Ort. Estetik", value: String(format: "%.1f", metrics.averageAestheticScore / 10.0))
+            scorecardCell(title: "Poz Uyumu", value: "\(metrics.poseMatchesAchieved)")
+            scorecardCell(title: "Paylaşım", value: "\(metrics.totalShares)")
+        }
+        .padding(10)
+        .background(.ultraThinMaterial, in: RoundedRectangle(cornerRadius: 14))
+    }
+
+    private func scorecardCell(title: String, value: String) -> some View {
+        VStack(spacing: 2) {
+            Text(value)
+                .font(.headline.monospacedDigit())
+                .foregroundStyle(.cyan)
+            Text(title)
+                .font(.caption2)
+                .foregroundStyle(.secondary)
+        }
+        .frame(maxWidth: .infinity)
     }
 }
