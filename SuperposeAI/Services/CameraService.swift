@@ -3,7 +3,7 @@ import UIKit
 
 @MainActor
 @Observable
-final class CameraService: NSObject {
+final class CameraService: NSObject, CameraServicing {
     enum CameraError: LocalizedError {
         case unauthorized
         case configurationFailed

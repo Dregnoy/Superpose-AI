@@ -132,4 +132,16 @@ struct ServiceTests {
         #expect(guidance.leadRoomHint == nil)
         #expect(PoseVisionService.leadRoomHint(in: nil) == nil)
     }
+
+    @Test("Core services conform to dependency injection protocols")
+    @MainActor
+    func serviceProtocolConformances() {
+        let camera: any CameraServicing = CameraService()
+        let library: any LibraryStoring = LibraryStore()
+        let packs: any ShotPackStoring = ShotPackStore()
+
+        #expect(camera.cameraPosition == .back)
+        #expect(library.items.count >= 0)
+        #expect(packs.consumeOnePack() == true)
+    }
 }

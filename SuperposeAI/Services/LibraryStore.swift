@@ -3,7 +3,7 @@ import Photos
 
 @MainActor
 @Observable
-final class LibraryStore {
+final class LibraryStore: LibraryStoring {
     var items: [LibraryItem] = []
 
     private let fileManager = FileManager.default

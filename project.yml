@@ -63,12 +63,20 @@ targets:
       - path: SuperposeAITests
     dependencies:
       - target: SuperposeAI
+  SuperposeAIUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: SuperposeAIUITests
+    dependencies:
+      - target: SuperposeAI
 schemes:
   SuperposeAI:
     build:
       targets:
         SuperposeAI: all
         SuperposeAITests: [test]
+        SuperposeAIUITests: [test]
     run:
       config: Debug
       storeKitConfiguration: SuperposeAI/Resources/Products.storekit
@@ -76,3 +84,4 @@ schemes:
       config: Debug
       targets:
         - SuperposeAITests
+        - SuperposeAIUITests
