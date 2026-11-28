@@ -179,9 +179,6 @@ final class CameraService: NSObject, CameraServicing {
             session.addOutput(photoOutput)
         }
         photoOutput.maxPhotoQualityPrioritization = .quality
-        if photoOutput.isAutoVirtualDeviceFusionSupported {
-            photoOutput.isAutoVirtualDeviceFusionEnabled = true
-        }
         if photoOutput.isResponsiveCaptureSupported {
             photoOutput.isResponsiveCaptureEnabled = true
         }
