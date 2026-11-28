@@ -4,6 +4,8 @@ import SwiftUI
 
 struct CompositionGridView: View {
     let mode: GridMode
+    var detectedSkeleton: PoseSkeleton? = nil
+    var isMirrored: Bool = false
 
     var body: some View {
         Canvas { context, size in
@@ -22,6 +24,34 @@ struct CompositionGridView: View {
                     hLine.move(to: CGPoint(x: 0, y: size.height * fraction))
                     hLine.addLine(to: CGPoint(x: size.width, y: size.height * fraction))
                     context.stroke(hLine, with: .color(lineColor), lineWidth: 0.75)
+                }
+
+                if let anchor = detectedSkeleton?.joints[.nose] ?? detectedSkeleton?.joints[.neck] {
+                    let ax = isMirrored ? (1.0 - anchor.x) : anchor.x
+                    let ay = anchor.y
+                    let targetX = ax < 0.5 ? (1.0 / 3.0) : (2.0 / 3.0)
+                    let targetY = 1.0 / 3.0
+                    let dist = hypot(ax - targetX, ay - targetY)
+                    let isAligned = dist <= 0.075
+                    let targetPt = CGPoint(x: size.width * targetX, y: size.height * targetY)
+                    let anchorPt = CGPoint(x: size.width * ax, y: size.height * ay)
+                    let ringColor: Color = isAligned ? .green : .cyan
+
+                    if !isAligned && dist < 0.28 {
+                        var guide = Path()
+                        guide.move(to: anchorPt)
+                        guide.addLine(to: targetPt)
+                        context.stroke(
+                            guide,
+                            with: .color(Color.cyan.opacity(0.55)),
+                            style: StrokeStyle(lineWidth: 1.2, dash: [4, 4])
+                        )
+                    }
+
+                    let outerRect = CGRect(x: targetPt.x - 14, y: targetPt.y - 14, width: 28, height: 28)
+                    context.stroke(Path(ellipseIn: outerRect), with: .color(ringColor.opacity(0.9)), lineWidth: 2.0)
+                    let innerRect = CGRect(x: targetPt.x - 3.5, y: targetPt.y - 3.5, width: 7, height: 7)
+                    context.fill(Path(ellipseIn: innerRect), with: .color(ringColor))
                 }
             case .goldenRatio:
                 for fraction in [0.382, 0.618] {

@@ -35,9 +35,11 @@ struct CameraView: View {
     @State private var recordingTimerTask: Task<Void, Never>?
     @State private var isProMode: Bool = false
     @State private var isFocusPeakingEnabled: Bool = false
+    @State private var isMonochromePreview: Bool = false
     @State private var isZenMode: Bool = false
     @State private var showToolsDrawer: Bool = false
     @State private var isFocusLocked: Bool = false
+    @State private var lockedJointLabel: String?
     @State private var focusPoint: CGPoint?
     @State private var exposureBias: Float = 0.0
     @State private var manualFocus: Float = 0.5
@@ -59,13 +61,30 @@ struct CameraView: View {
             if cameraService.authorizationStatus == .authorized {
                 GeometryReader { geo in
                     CameraPreviewRepresentable(session: cameraService.session)
+                        .saturation(isMonochromePreview ? 0 : 1)
+                        .contrast(isMonochromePreview ? 1.08 : 1.0)
                         .contentShape(Rectangle())
                         .onTapGesture { location in
+                            if let (joint, jointLoc) = nearestDetectedJoint(to: location, in: geo.size) {
+                                let normalized = CGPoint(
+                                    x: max(0, min(1, jointLoc.y / geo.size.height)),
+                                    y: max(0, min(1, 1.0 - (jointLoc.x / geo.size.width)))
+                                )
+                                let label = Self.jointDisplayLabel(joint)
+                                isFocusLocked = true
+                                lockedJointLabel = label
+                                focusPoint = jointLoc
+                                cameraService.focusAndExpose(at: normalized, lock: true)
+                                UIImpactFeedbackGenerator(style: .medium).impactOccurred()
+                                showToast("Odak kilitlendi: \(label)")
+                                return
+                            }
                             let normalized = CGPoint(
                                 x: max(0, min(1, location.y / geo.size.height)),
                                 y: max(0, min(1, 1.0 - (location.x / geo.size.width)))
                             )
                             isFocusLocked = false
+                            lockedJointLabel = nil
                             cameraService.focusAndExpose(at: normalized, lock: false)
                             focusPoint = location
                             Task {
@@ -118,7 +137,7 @@ struct CameraView: View {
             if let focusPoint {
                 VStack(spacing: 4) {
                     if isFocusLocked {
-                        Text("AE/AF KİLİT")
+                        Text(lockedJointLabel ?? "AE/AF KİLİT")
                             .font(.system(size: 9, weight: .bold))
                             .padding(.horizontal, 6)
                             .padding(.vertical, 2)
@@ -156,7 +175,11 @@ struct CameraView: View {
             // Optional Composition Grid (1/3, Symmetry, Diagonal) + Horizon / Flat-Lay Level
             if appState.gridMode != .off {
                 ZStack {
-                    CompositionGridView(mode: appState.gridMode)
+                    CompositionGridView(
+                        mode: appState.gridMode,
+                        detectedSkeleton: visionService.guidance.detectedSkeleton,
+                        isMirrored: cameraService.cameraPosition == .front
+                    )
                     if horizonService.isFlatLayOrientation {
                         FlatLayCrosshairView(
                             offsetX: horizonService.flatLayOffsetX,
@@ -508,6 +531,7 @@ struct CameraView: View {
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
 
+                monochromeToggleButton
                 zenToggleButton
             }
 
@@ -515,6 +539,22 @@ struct CameraView: View {
                 quickPoseAndGuideRow
             }
         }
+    }
+
+    private var monochromeToggleButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.18)) {
+                isMonochromePreview.toggle()
+            }
+            showToast(isMonochromePreview ? "Siyah-Beyaz Önizleme Açık" : "Renkli Önizleme")
+        } label: {
+            Image(systemName: "circle.lefthalf.filled")
+                .font(.caption)
+                .foregroundStyle(isMonochromePreview ? .yellow : .white)
+                .padding(7)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .accessibilityLabel(isMonochromePreview ? "Renkli Önizleme" : "Siyah-Beyaz Önizleme")
     }
 
     private var zenToggleButton: some View {
@@ -530,6 +570,41 @@ struct CameraView: View {
                 .background(.ultraThinMaterial, in: Circle())
         }
         .accessibilityLabel(isZenMode ? "Arayüzü Göster" : "Temiz Vizör")
+    }
+
+    private func nearestDetectedJoint(to location: CGPoint, in size: CGSize) -> (BodyJoint, CGPoint)? {
+        guard let skeleton = visionService.guidance.detectedSkeleton else { return nil }
+        let isFront = cameraService.cameraPosition == .front
+        var best: (BodyJoint, CGPoint, CGFloat)?
+        for (joint, pt) in skeleton.joints {
+            let x = (isFront ? (1.0 - pt.x) : pt.x) * size.width
+            let y = pt.y * size.height
+            let dist = hypot(location.x - x, location.y - y)
+            if dist <= 44, best == nil || dist < best!.2 {
+                best = (joint, CGPoint(x: x, y: y), dist)
+            }
+        }
+        return best.map { ($0.0, $0.1) }
+    }
+
+    private static func jointDisplayLabel(_ joint: BodyJoint) -> String {
+        switch joint {
+        case .nose: return "Yüz / Göz"
+        case .neck: return "Boyun"
+        case .leftShoulder: return "Sol Omuz"
+        case .rightShoulder: return "Sağ Omuz"
+        case .leftElbow: return "Sol Dirsek"
+        case .rightElbow: return "Sağ Dirsek"
+        case .leftWrist: return "Sol El"
+        case .rightWrist: return "Sağ El"
+        case .root: return "Gövde"
+        case .leftHip: return "Sol Kalça"
+        case .rightHip: return "Sağ Kalça"
+        case .leftKnee: return "Sol Diz"
+        case .rightKnee: return "Sağ Diz"
+        case .leftAnkle: return "Sol Ayak"
+        case .rightAnkle: return "Sağ Ayak"
+        }
     }
 
     private var quickPoseAndGuideRow: some View {
