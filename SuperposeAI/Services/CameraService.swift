@@ -155,7 +155,7 @@ final class CameraService: NSObject, CameraServicing {
                 }
                 if device.isExposurePointOfInterestSupported {
                     device.exposurePointOfInterest = normalizedPoint
-                    device.exposureMode = lock ? .locked : .autoExpose
+                    device.exposureMode = lock ? .locked : .continuousAutoExposure
                 }
                 device.unlockForConfiguration()
             } catch {
@@ -182,6 +182,12 @@ final class CameraService: NSObject, CameraServicing {
             }
             if device.isExposureModeSupported(.continuousAutoExposure) {
                 device.exposureMode = .continuousAutoExposure
+            }
+            if device.isWhiteBalanceModeSupported(.continuousAutoWhiteBalance) {
+                device.whiteBalanceMode = .continuousAutoWhiteBalance
+            }
+            if device.isLowLightBoostSupported {
+                device.automaticallyEnablesLowLightBoostWhenAvailable = true
             }
             device.unlockForConfiguration()
         } catch {
@@ -458,6 +464,7 @@ final class CameraService: NSObject, CameraServicing {
                     }
                 } else {
                     settings = AVCapturePhotoSettings()
+                    settings.photoQualityPrioritization = .quality
                 }
                 if self.photoOutput.supportedFlashModes.contains(flash) {
                     settings.flashMode = flash
@@ -554,6 +561,7 @@ final class CameraService: NSObject, CameraServicing {
         if !session.outputs.contains(photoOutput), session.canAddOutput(photoOutput) {
             session.addOutput(photoOutput)
         }
+        photoOutput.maxPhotoQualityPrioritization = .quality
 
         if !session.outputs.contains(movieOutput), session.canAddOutput(movieOutput) {
             session.addOutput(movieOutput)
