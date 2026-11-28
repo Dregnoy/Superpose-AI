@@ -152,4 +152,33 @@ struct PoseVisionTests {
         #expect(fused.size.height == 48)
         #expect(PhotoEnhancerService.developRAW(Data()) == nil)
     }
+
+    @Test("PhotoEnhancerService applyLook preserves dimensions across all presets")
+    func photoLookPresets() {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 40, height: 40))
+        let sample = renderer.image { ctx in
+            UIColor.systemTeal.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 40, height: 40))
+        }
+        for preset in PhotoLookPreset.allCases {
+            let styled = PhotoEnhancerService.applyLook(preset, to: sample)
+            #expect(styled.size.width == 40)
+            #expect(styled.size.height == 40)
+        }
+        #expect(PhotoLookPreset.natural.next == .cinematic)
+    }
+
+    @Test("PoseVisionService evaluateCouplesBalance detects wide horizontal gap")
+    func multiPersonSpacingHint() {
+        let leftPerson = PoseSkeleton(joints: [
+            .neck: NormalizedPoint(x: 0.12, y: 0.30),
+            .root: NormalizedPoint(x: 0.12, y: 0.60)
+        ])
+        let rightPerson = PoseSkeleton(joints: [
+            .neck: NormalizedPoint(x: 0.88, y: 0.30),
+            .root: NormalizedPoint(x: 0.88, y: 0.60)
+        ])
+        let hint = PoseVisionService.evaluateCouplesBalance(first: leftPerson, second: rightPerson)
+        #expect(hint?.contains("birbirinize") == true)
+    }
 }

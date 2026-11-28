@@ -2,6 +2,22 @@ import CoreImage
 import Metal
 import UIKit
 
+/// One-tap visual look presets for Simple Mode and post-capture styling.
+enum PhotoLookPreset: String, CaseIterable, Identifiable {
+    case natural = "Doğal"
+    case cinematic = "Sinematik"
+    case goldenHour = "Altın Saat"
+    case monochrome = "Siyah-Beyaz"
+
+    var id: String { rawValue }
+
+    var next: PhotoLookPreset {
+        let all = Self.allCases
+        guard let idx = all.firstIndex(of: self) else { return .natural }
+        return all[(idx + 1) % all.count]
+    }
+}
+
 /// Applies subtle, natural on-device shadow/highlight recovery, vibrance,
 /// and luminance sharpening using CoreImage—zero cloud upload.
 enum PhotoEnhancerService {
@@ -11,6 +27,51 @@ enum PhotoEnhancerService {
         }
         return CIContext()
     }()
+
+    static func applyLook(_ preset: PhotoLookPreset, to image: UIImage) -> UIImage {
+        guard preset != .natural else { return image }
+        guard let cgImage = image.cgImage else { return image }
+        var current = CIImage(cgImage: cgImage)
+
+        switch preset {
+        case .natural:
+            return image
+        case .cinematic:
+            if let vibrance = CIFilter(name: "CIVibrance") {
+                vibrance.setValue(current, forKey: kCIInputImageKey)
+                vibrance.setValue(-0.12, forKey: "inputAmount")
+                if let out = vibrance.outputImage { current = out }
+            }
+            if let controls = CIFilter(name: "CIColorControls") {
+                controls.setValue(current, forKey: kCIInputImageKey)
+                controls.setValue(1.12, forKey: kCIInputContrastKey)
+                controls.setValue(-0.02, forKey: kCIInputBrightnessKey)
+                if let out = controls.outputImage { current = out }
+            }
+        case .goldenHour:
+            if let temp = CIFilter(name: "CITemperatureAndTint") {
+                temp.setValue(current, forKey: kCIInputImageKey)
+                temp.setValue(CIVector(x: 6800, y: 0), forKey: "inputNeutral")
+                temp.setValue(CIVector(x: 5400, y: 0), forKey: "inputTargetNeutral")
+                if let out = temp.outputImage { current = out }
+            }
+            if let vibrance = CIFilter(name: "CIVibrance") {
+                vibrance.setValue(current, forKey: kCIInputImageKey)
+                vibrance.setValue(0.20, forKey: "inputAmount")
+                if let out = vibrance.outputImage { current = out }
+            }
+        case .monochrome:
+            if let mono = CIFilter(name: "CIPhotoEffectNoir") {
+                mono.setValue(current, forKey: kCIInputImageKey)
+                if let out = mono.outputImage { current = out }
+            }
+        }
+
+        guard let outputCG = context.createCGImage(current, from: current.extent) else {
+            return image
+        }
+        return UIImage(cgImage: outputCG, scale: image.scale, orientation: image.imageOrientation)
+    }
 
     static func naturalizeAndSharpen(_ image: UIImage) -> UIImage {
         guard let cgImage = image.cgImage else { return image }

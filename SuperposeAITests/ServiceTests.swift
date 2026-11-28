@@ -146,4 +146,24 @@ struct ServiceTests {
         #expect(library.items.count >= 0)
         #expect(packs.consumeOnePack() == true)
     }
+
+    @Test("AIPoseGeneratorService offline rule engine adapts tips to lighting")
+    func offlineRuleEngineAdaptsToLighting() {
+        let poses = AIPoseGeneratorService.generateOfflinePoses(
+            from: nil,
+            sceneTags: ["cafe"],
+            lighting: .tooDark,
+            useCase: .portrait
+        )
+        #expect(poses.count == 4)
+        #expect(poses.first?.confidenceTag == "Çevrimdışı AI")
+        #expect(poses.first?.coaching.photographerTips.first?.contains("Işık düşük") == true)
+    }
+
+    @Test("MockPoseCatalog quickOfflinePoses provides categorized templates")
+    func poseTemplateCatalogNonEmpty() {
+        let templates = MockPoseCatalog.quickOfflinePoses
+        #expect(templates.count >= 4)
+        #expect(templates.contains(where: { $0.category == .couples }))
+    }
 }

@@ -84,7 +84,8 @@ extension CameraView {
                    let rawDeveloped = PhotoEnhancerService.developRAW(rawDNGData) {
                     developedImage = rawDeveloped
                 } else {
-                    developedImage = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(image) : image
+                    let baseImage = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(image) : image
+                    developedImage = PhotoEnhancerService.applyLook(selectedLook, to: baseImage)
                 }
                 let pinned = appState.pinnedPose
                 let savedID = libraryStore.saveCapturedPhoto(

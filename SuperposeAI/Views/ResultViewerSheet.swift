@@ -17,6 +17,7 @@ struct ResultViewerSheet: View {
 
     enum CropRatio: String, CaseIterable, Identifiable {
         case original = "Tam"
+        case square1x1 = "1:1"
         case feed4x5 = "4:5"
         case story9x16 = "9:16"
 
@@ -459,6 +460,7 @@ struct ResultViewerSheet: View {
         let targetAspect: CGFloat
         switch ratio {
         case .original: return image
+        case .square1x1: targetAspect = 1.0
         case .feed4x5: targetAspect = 4.0 / 5.0
         case .story9x16: targetAspect = 9.0 / 16.0
         }

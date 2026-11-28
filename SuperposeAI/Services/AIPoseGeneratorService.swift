@@ -35,8 +35,81 @@ struct AIPoseGeneratorService: PoseGenerating {
             }
         }
 
-        try await Task.sleep(for: .milliseconds(700))
-        return MockPoseCatalog.generateFourPoses(for: useCase)
+        try await Task.sleep(for: .milliseconds(350))
+        return Self.generateOfflinePoses(
+            from: skeleton,
+            sceneTags: sceneTags,
+            lighting: lighting,
+            useCase: useCase
+        )
+    }
+
+    /// On-device rule-based pose engine used when offline or without an API key.
+    /// Adapts pose selection and coaching tips to live lighting, scene tags, and subject presence.
+    static func generateOfflinePoses(
+        from skeleton: PoseSkeleton?,
+        sceneTags: [String],
+        lighting: LightingStatus,
+        useCase: PoseUseCase
+    ) -> [PoseIdea] {
+        let normalizedTags = Set(sceneTags.map { $0.lowercased() })
+        let basePool = MockPoseCatalog.generateFourPoses(for: useCase) + MockPoseCatalog.quickOfflinePoses
+
+        // Deduplicate by title while prioritizing scene-matching categories
+        var seenTitles = Set<String>()
+        let uniquePool = basePool.filter { seenTitles.insert($0.title).inserted }
+
+        let prioritized: [PoseIdea] = uniquePool.sorted { lhs, rhs in
+            let lScore = sceneMatchPriority(for: lhs, tags: normalizedTags, useCase: useCase)
+            let rScore = sceneMatchPriority(for: rhs, tags: normalizedTags, useCase: useCase)
+            return lScore > rScore
+        }
+
+        let lightingTip: String? = {
+            switch lighting {
+            case .tooDark, .lowContrast:
+                return "Işık düşük: pencereye/ışık kaynağına yaklaş veya pozlamayı hafif artır."
+            case .backlitOrHarsh:
+                return "Ters ışık var: ışığı 45° yanına al ya da silüet çekimi dene."
+            case .turnLeftForLight:
+                return "Sol taraftan daha dengeli ışık geliyor; yüzünü hafif sola çevir."
+            case .turnRightForLight:
+                return "Sağ taraftan daha dengeli ışık geliyor; yüzünü hafif sağa çevir."
+            case .good, .evaluating:
+                return nil
+            }
+        }()
+
+        return Array(prioritized.prefix(4)).map { pose in
+            var tips = pose.coaching.photographerTips
+            if let lightingTip, !tips.contains(lightingTip) {
+                tips.insert(lightingTip, at: 0)
+            }
+            return PoseIdea(
+                id: pose.id,
+                title: pose.title,
+                angleLabel: pose.angleLabel,
+                confidenceTag: skeleton != nil ? "Sahne Uyumlu" : "Çevrimdışı AI",
+                category: pose.category,
+                skeleton: pose.skeleton,
+                secondarySkeleton: pose.secondarySkeleton,
+                coaching: CoachingTips(
+                    summary: pose.coaching.summary,
+                    subjectTips: pose.coaching.subjectTips,
+                    photographerTips: tips
+                )
+            )
+        }
+    }
+
+    private static func sceneMatchPriority(for pose: PoseIdea, tags: Set<String>, useCase: PoseUseCase) -> Int {
+        var score = 0
+        if useCase == .couples && pose.category == .couples { score += 5 }
+        if tags.contains(where: { $0.contains("cafe") || $0.contains("indoor") || $0.contains("coffee") }) && pose.category == .cafe { score += 4 }
+        if tags.contains(where: { $0.contains("beach") || $0.contains("sea") || $0.contains("sunset") }) && pose.category == .beach { score += 4 }
+        if tags.contains(where: { $0.contains("portrait") || $0.contains("face") }) && pose.category == .portrait { score += 4 }
+        if tags.contains(where: { $0.contains("street") || $0.contains("outdoor") || $0.contains("city") }) && pose.category == .street { score += 3 }
+        return score
     }
 
     private func requestAnonymousGeminiPoses(

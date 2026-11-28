@@ -47,6 +47,8 @@ struct CameraView: View {
     @State var manualShutter: Double = 0.01 // 1/100s
     @State var manualWB: Float = 5500
     @State var previewingLatestItem: LibraryItem?
+    @State var showPoseTemplates: Bool = false
+    @State var selectedLook: PhotoLookPreset = .natural
 
     let poseGenerator = AIPoseGeneratorService()
 
@@ -504,6 +506,9 @@ struct CameraView: View {
         }
         .sheet(item: $previewingLatestItem) { item in
             ResultViewerSheet(item: item)
+        }
+        .sheet(isPresented: $showPoseTemplates) {
+            PoseTemplatePickerSheet()
         }
         .onChange(of: appState.pendingCameraTip) { _, tip in
             if let tip {

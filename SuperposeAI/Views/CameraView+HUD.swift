@@ -530,6 +530,32 @@ extension CameraView {
                 }
                 .buttonStyle(.plain)
 
+                if !isVideoMode {
+                    Button {
+                        showPoseTemplates = true
+                    } label: {
+                        Image(systemName: "figure.stand")
+                            .font(.caption)
+                            .foregroundStyle(appState.pinnedPose != nil ? .black : .white)
+                            .frame(width: 32, height: 32)
+                            .background(appState.pinnedPose != nil ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        selectedLook = selectedLook.next
+                        showToast("Stil: \(selectedLook.rawValue)")
+                    } label: {
+                        Text(selectedLook.rawValue)
+                            .font(.caption2.bold())
+                            .foregroundStyle(selectedLook != .natural ? .black : .white)
+                            .padding(.horizontal, 8)
+                            .padding(.vertical, 7)
+                            .background(selectedLook != .natural ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+
                 if isProMode {
                     Button {
                         withAnimation(.spring(response: 0.28, dampingFraction: 0.85)) {
