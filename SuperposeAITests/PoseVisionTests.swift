@@ -201,4 +201,23 @@ struct PoseVisionTests {
         #expect(storyCard.size.width == 1080)
         #expect(storyCard.size.height == 1920)
     }
+
+    @Test("ShotQualityBreakdown and Studio Relight handle flat sample cleanly")
+    @MainActor
+    func topShotAndStudioRelight() async {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 64, height: 64))
+        let sample = renderer.image { ctx in
+            UIColor.darkGray.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 64, height: 64))
+        }
+        let vision = PoseVisionService()
+        let breakdown = await vision.evaluateShotQuality(image: sample)
+        #expect(breakdown.eyesClosed == false)
+        #expect(breakdown.isSmiling == false)
+
+        let relit = await PoseVisionService.applyStudioRelight(to: sample)
+        if let relit {
+            #expect(relit.size.width == 64)
+        }
+    }
 }

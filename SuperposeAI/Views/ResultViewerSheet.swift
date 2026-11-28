@@ -47,6 +47,8 @@ struct ResultViewerSheet: View {
     @State private var enhancedCache: UIImage?
     @State private var isMagicApplied = false
     @State private var magicCache: UIImage?
+    @State private var isStudioRelight = false
+    @State private var relightCache: UIImage?
     @State private var aestheticReport: AestheticScoreReport?
 
     private static let sharedCIContext = PhotoEnhancerService.context
@@ -195,6 +197,17 @@ struct ResultViewerSheet: View {
                             .font(.subheadline)
                             .tint(.cyan)
                     }
+
+                    Toggle("Sanal Stüdyo Işığı (Özne Aydınlat)", isOn: $isStudioRelight)
+                        .font(.subheadline)
+                        .tint(.yellow)
+                        .onChange(of: isStudioRelight) { _, enabled in
+                            guard enabled, relightCache == nil,
+                                  let original = libraryStore.image(for: item) else { return }
+                            Task {
+                                relightCache = await PoseVisionService.applyStudioRelight(to: original)
+                            }
+                        }
 
                     Toggle("Portre Bokeh (Yumuşak Arka Plan)", isOn: $isPortraitBokeh)
                         .font(.subheadline)
@@ -372,6 +385,7 @@ struct ResultViewerSheet: View {
             .onReceive(NotificationCenter.default.publisher(for: UIApplication.didReceiveMemoryWarningNotification)) { _ in
                 enhancedCache = nil
                 magicCache = nil
+                relightCache = nil
                 bokehBaseImage = nil
                 isApplyingBokeh = false
             }
@@ -439,6 +453,9 @@ struct ResultViewerSheet: View {
 
     private func styledImage() -> UIImage? {
         var baseImage: UIImage? = isPortraitBokeh ? (bokehBaseImage ?? libraryStore.image(for: item)) : libraryStore.image(for: item)
+        if isStudioRelight, let relit = relightCache {
+            baseImage = relit
+        }
         if isMagicApplied {
             baseImage = magicCache ?? baseImage.map { PhotoEnhancerService.applyOneTapMagic($0) }
         } else if isNaturalEnhanced {

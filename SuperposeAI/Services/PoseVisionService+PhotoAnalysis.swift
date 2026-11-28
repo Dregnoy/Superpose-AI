@@ -98,7 +98,7 @@ extension PoseVisionService {
         }
     }
 
-    nonisolated private static func cgImageOrientation(from uiOrientation: UIImage.Orientation) -> CGImagePropertyOrientation {
+    nonisolated static func cgImageOrientation(from uiOrientation: UIImage.Orientation) -> CGImagePropertyOrientation {
         switch uiOrientation {
         case .up: return .up
         case .down: return .down
@@ -166,6 +166,24 @@ extension PoseVisionService {
         let faceQuality: Double
         let sharpnessScore: Double
         let poseMatchScore: Double?
+        let eyesClosed: Bool
+        let isSmiling: Bool
+
+        init(
+            totalScore: Double,
+            faceQuality: Double,
+            sharpnessScore: Double,
+            poseMatchScore: Double?,
+            eyesClosed: Bool = false,
+            isSmiling: Bool = false
+        ) {
+            self.totalScore = totalScore
+            self.faceQuality = faceQuality
+            self.sharpnessScore = sharpnessScore
+            self.poseMatchScore = poseMatchScore
+            self.eyesClosed = eyesClosed
+            self.isSmiling = isSmiling
+        }
     }
 
     /// Evaluates face capture quality, edge sharpness, and optional pose alignment
@@ -208,7 +226,8 @@ extension PoseVisionService {
 
         let orientation = cgImageOrientation(from: image.imageOrientation)
         let faceRequest = VNDetectFaceCaptureQualityRequest()
-        var requests: [VNRequest] = [faceRequest]
+        let landmarksRequest = VNDetectFaceLandmarksRequest()
+        var requests: [VNRequest] = [faceRequest, landmarksRequest]
         let poseRequest: VNDetectHumanBodyPoseRequest?
         if targetPose != nil {
             let pr = VNDetectHumanBodyPoseRequest()
@@ -223,6 +242,8 @@ extension PoseVisionService {
 
         let hasFace = !(faceRequest.results?.isEmpty ?? true)
         let faceQuality = Double(faceRequest.results?.first?.faceCaptureQuality ?? 0.0)
+        let eyesClosed = areEyesClosed(in: landmarksRequest.results)
+        let smiling = !eyesClosed && isSmiling(in: landmarksRequest.results)
         let sharpness = computeSharpnessScore(cgImage: cgImage)
 
         var poseMatchScore: Double? = nil
@@ -231,7 +252,7 @@ extension PoseVisionService {
             poseMatchScore = Double(computePoseMatchScore(live: detected, target: target.skeleton))
         }
 
-        let totalScore: Double
+        var totalScore: Double
         if hasFace, let poseScore = poseMatchScore {
             totalScore = 0.45 * (faceQuality * 100.0) + 0.35 * (sharpness * 100.0) + 0.20 * poseScore
         } else if hasFace {
@@ -242,11 +263,19 @@ extension PoseVisionService {
             totalScore = sharpness * 100.0
         }
 
+        if eyesClosed {
+            totalScore -= 35.0
+        } else if smiling {
+            totalScore += 12.0
+        }
+
         return ShotQualityBreakdown(
             totalScore: min(100.0, max(0.0, totalScore)),
             faceQuality: faceQuality,
             sharpnessScore: sharpness,
-            poseMatchScore: poseMatchScore
+            poseMatchScore: poseMatchScore,
+            eyesClosed: eyesClosed,
+            isSmiling: smiling
         )
     }
 

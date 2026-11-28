@@ -29,17 +29,22 @@ extension CameraView {
 
     func captureAndSavePhoto() async {
         do {
-            if isBurstEnabled {
+            let useTopShot = isBurstEnabled || (appState.pinnedPose != nil && !cameraService.isRAWEnabled && !cameraService.isHDRBracketingEnabled)
+            if useTopShot {
                 var burstFrames: [UIImage] = []
                 for idx in 0..<3 {
                     let frame = try await cameraService.capturePhoto()
                     burstFrames.append(frame)
                     if idx < 2 {
-                        try? await Task.sleep(for: .milliseconds(160))
+                        try? await Task.sleep(for: .milliseconds(140))
                     }
                 }
                 if let best = await visionService.pickBestShot(from: burstFrames, targetPose: appState.pinnedPose) {
-                    let finalBest = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(best) : best
+                    let baseBest = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(best) : best
+                    let magicBest = isOneTapMagicEnabled
+                        ? PhotoEnhancerService.applyOneTapMagic(baseBest, lumaHint: visionService.guidance.lumaScore)
+                        : baseBest
+                    let finalBest = PhotoEnhancerService.applyLook(selectedLook, to: magicBest)
                     let pinned = appState.pinnedPose
                     let savedID = libraryStore.saveCapturedPhoto(
                         finalBest,
@@ -53,10 +58,20 @@ extension CameraView {
                         let quality = await visionService.evaluateShotQuality(image: finalBest, targetPose: pinned)
                         libraryStore.updateQualityScore(id: savedID, score: quality.totalScore)
                     }
+                    let aesthetic = AestheticScoringService.evaluate(
+                        image: finalBest,
+                        poseMatchScore: visionService.guidance.poseMatchScore,
+                        subjectCenter: visionService.guidance.detectedFaceBox.map { CGPoint(x: $0.midX, y: $0.midY) }
+                    )
+                    ShootingMetricsStore.shared.recordShot(
+                        aestheticScore: aesthetic.overallScore,
+                        usedMagic: isOneTapMagicEnabled,
+                        poseMatchScore: visionService.guidance.poseMatchScore
+                    )
                     if appState.autoSaveToApplePhotos, let latest = libraryStore.items.first {
                         _ = await libraryStore.saveToApplePhotos(latest)
                     }
-                    showToast("En net kare (3'ten) kaydedildi")
+                    showToast("En İyi An (göz açık & net) kaydedildi")
                 }
             } else if cameraService.isHDRBracketingEnabled && !cameraService.isRAWEnabled {
                 let hdrImage = try await cameraService.captureBracketedHDR()
