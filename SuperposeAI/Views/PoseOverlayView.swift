@@ -84,13 +84,20 @@ struct PoseOverlayView: View {
             path.move(to: CGPoint(x: p1.x * size.width, y: p1.y * size.height))
             path.addLine(to: CGPoint(x: p2.x * size.width, y: p2.y * size.height))
 
+            let boneColor = boneAlignmentColor(
+                start: startJoint,
+                end: endJoint,
+                targetP1: p1,
+                targetP2: p2,
+                defaultTint: tint
+            )
             let lineWidth: CGFloat = mode == .detailedContour ? 5 : 3
             let style = StrokeStyle(
                 lineWidth: lineWidth,
                 lineCap: .round,
                 dash: mode == .fastSilhouette ? [6, 6] : []
             )
-            context.stroke(path, with: .color(tint.opacity(0.85)), style: style)
+            context.stroke(path, with: .color(boneColor.opacity(0.88)), style: style)
         }
 
         if let nose = skeleton.joints[.nose] {
@@ -104,6 +111,35 @@ struct PoseOverlayView: View {
             let pt = CGPoint(x: point.x * size.width, y: point.y * size.height)
             let dotRect = CGRect(x: pt.x - 4, y: pt.y - 4, width: 8, height: 8)
             context.fill(Path(ellipseIn: dotRect), with: .color(.white))
+        }
+    }
+
+    private func boneAlignmentColor(
+        start: BodyJoint,
+        end: BodyJoint,
+        targetP1: NormalizedPoint,
+        targetP2: NormalizedPoint,
+        defaultTint: Color
+    ) -> Color {
+        guard let live = liveSkeleton,
+              let l1 = live.joints[start],
+              let l2 = live.joints[end] else {
+            return defaultTint
+        }
+        let tvx = targetP2.x - targetP1.x
+        let tvy = targetP2.y - targetP1.y
+        let lvx = l2.x - l1.x
+        let lvy = l2.y - l1.y
+        let tLen = hypot(tvx, tvy)
+        let lLen = hypot(lvx, lvy)
+        guard tLen > 0.005, lLen > 0.005 else { return defaultTint }
+        let cosine = (tvx * lvx + tvy * lvy) / (tLen * lLen)
+        if cosine >= 0.90 {
+            return isNightHud ? .orange : .green
+        } else if cosine >= 0.65 {
+            return .yellow
+        } else {
+            return .orange
         }
     }
 

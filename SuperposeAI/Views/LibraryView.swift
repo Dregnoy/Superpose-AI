@@ -9,6 +9,7 @@ struct LibraryView: View {
 
     enum LibraryFilter: String, CaseIterable, Identifiable {
         case all = "Tümü"
+        case bestShots = "En İyiler"
         case posed = "Pozlu"
         case favorites = "Favoriler"
 
@@ -54,9 +55,16 @@ struct LibraryView: View {
 
                         let displayedItems: [LibraryItem] = {
                             switch libraryFilter {
-                            case .all: return libraryStore.items
-                            case .posed: return libraryStore.items.filter { $0.poseIdea != nil }
-                            case .favorites: return libraryStore.items.filter { $0.isFavorite }
+                            case .all:
+                                return libraryStore.items
+                            case .bestShots:
+                                return libraryStore.items
+                                    .filter { ($0.qualityScore ?? 0) >= 75 }
+                                    .sorted { ($0.qualityScore ?? 0) > ($1.qualityScore ?? 0) }
+                            case .posed:
+                                return libraryStore.items.filter { $0.poseIdea != nil }
+                            case .favorites:
+                                return libraryStore.items.filter { $0.isFavorite }
                             }
                         }()
 

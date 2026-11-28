@@ -131,4 +131,25 @@ struct PoseVisionTests {
         #expect(flatScore >= 0.0 && flatScore <= 1.0)
         #expect(sharpScore > flatScore)
     }
+
+    @Test("PhotoEnhancerService fuseExposureBracket preserves dimensions and handles invalid RAW")
+    func exposureBracketAndRawFallback() {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 48, height: 48))
+        let dark = renderer.image { ctx in
+            UIColor.darkGray.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 48, height: 48))
+        }
+        let mid = renderer.image { ctx in
+            UIColor.gray.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 48, height: 48))
+        }
+        let bright = renderer.image { ctx in
+            UIColor.lightGray.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 48, height: 48))
+        }
+        let fused = PhotoEnhancerService.fuseExposureBracket([dark, mid, bright])
+        #expect(fused.size.width == 48)
+        #expect(fused.size.height == 48)
+        #expect(PhotoEnhancerService.developRAW(Data()) == nil)
+    }
 }

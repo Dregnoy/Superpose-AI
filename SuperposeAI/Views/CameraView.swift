@@ -35,6 +35,7 @@ struct CameraView: View {
     @State private var recordingTimerTask: Task<Void, Never>?
     @State private var isProMode: Bool = false
     @State private var isFocusPeakingEnabled: Bool = false
+    @State private var isZenMode: Bool = false
     @State private var showToolsDrawer: Bool = false
     @State private var isFocusLocked: Bool = false
     @State private var focusPoint: CGPoint?
@@ -282,7 +283,14 @@ struct CameraView: View {
             if isLandscape {
                 HStack(spacing: 0) {
                     VStack {
-                        topGuidanceHUD
+                        if !isZenMode {
+                            topGuidanceHUD
+                        } else {
+                            HStack {
+                                Spacer()
+                                zenToggleButton
+                            }
+                        }
                         Spacer()
                         if let toastMessage {
                             Text(toastMessage)
@@ -300,7 +308,14 @@ struct CameraView: View {
                 .padding(.vertical, 8)
             } else {
                 VStack {
-                    topGuidanceHUD
+                    if !isZenMode {
+                        topGuidanceHUD
+                    } else {
+                        HStack {
+                            Spacer()
+                            zenToggleButton
+                        }
+                    }
                     Spacer()
                     if let toastMessage {
                         Text(toastMessage)
@@ -492,12 +507,29 @@ struct CameraView: View {
                     .padding(.horizontal, 10)
                     .padding(.vertical, 6)
                     .background(.ultraThinMaterial, in: Capsule())
+
+                zenToggleButton
             }
 
             if !appState.isOneHandedMode {
                 quickPoseAndGuideRow
             }
         }
+    }
+
+    private var zenToggleButton: some View {
+        Button {
+            withAnimation(.easeInOut(duration: 0.2)) {
+                isZenMode.toggle()
+            }
+        } label: {
+            Image(systemName: isZenMode ? "eye.slash.fill" : "eye")
+                .font(.caption)
+                .foregroundStyle(isZenMode ? .cyan : .white)
+                .padding(7)
+                .background(.ultraThinMaterial, in: Circle())
+        }
+        .accessibilityLabel(isZenMode ? "Arayüzü Göster" : "Temiz Vizör")
     }
 
     private var quickPoseAndGuideRow: some View {
@@ -963,8 +995,16 @@ struct CameraView: View {
                 } label: {
                     ZStack {
                         Circle()
-                            .stroke(autoShutterCountdown != nil ? Color.cyan : (isShotReady ? Color.green : Color.white), lineWidth: isShotReady ? 5 : 4)
+                            .stroke(autoShutterCountdown != nil ? Color.cyan : (isShotReady ? Color.green : Color.white.opacity(0.45)), lineWidth: isShotReady ? 5 : 4)
                             .frame(width: 72, height: 72)
+                        if appState.pinnedPose != nil, let matchScore = visionService.guidance.poseMatchScore, !isVideoMode {
+                            Circle()
+                                .trim(from: 0, to: CGFloat(min(100, max(0, matchScore))) / 100.0)
+                                .stroke(matchScore >= 85 ? Color.green : Color.cyan, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                                .rotationEffect(.degrees(-90))
+                                .frame(width: 72, height: 72)
+                                .animation(.easeOut(duration: 0.18), value: matchScore)
+                        }
                         if isVideoMode {
                             RoundedRectangle(cornerRadius: cameraService.isRecording ? 8 : 29)
                                 .fill(Color.red)
@@ -1099,13 +1139,26 @@ struct CameraView: View {
                     .tint(.mint)
 
                     if cameraService.isRAWSupported {
-                        Button("RAW") {
+                        Button(cameraService.isAppleProRAWSupported ? "ProRAW" : "RAW") {
                             cameraService.isRAWEnabled.toggle()
+                            if cameraService.isRAWEnabled {
+                                cameraService.isHDRBracketingEnabled = false
+                            }
                         }
                         .buttonStyle(.borderedProminent)
                         .tint(cameraService.isRAWEnabled ? .yellow : .gray.opacity(0.4))
                         .foregroundStyle(cameraService.isRAWEnabled ? .black : .white)
                     }
+
+                    Button("HDR+") {
+                        cameraService.isHDRBracketingEnabled.toggle()
+                        if cameraService.isHDRBracketingEnabled {
+                            cameraService.isRAWEnabled = false
+                        }
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .tint(cameraService.isHDRBracketingEnabled ? .cyan : .gray.opacity(0.4))
+                    .foregroundStyle(cameraService.isHDRBracketingEnabled ? .black : .white)
                 }
                 .font(.caption2.bold())
             }
@@ -1410,12 +1463,11 @@ struct CameraView: View {
                     }
                     showToast("En net kare (3'ten) kaydedildi")
                 }
-            } else {
-                let (image, rawDNGData) = try await cameraService.capturePhotoWithRAW(preferRAW: isProMode)
-                let finalImage = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(image) : image
+            } else if cameraService.isHDRBracketingEnabled && !cameraService.isRAWEnabled {
+                let hdrImage = try await cameraService.captureBracketedHDR()
                 let pinned = appState.pinnedPose
                 let savedID = libraryStore.saveCapturedPhoto(
-                    finalImage,
+                    hdrImage,
                     isGeneratedReference: false,
                     poseIdea: pinned,
                     zoomFactor: Double(cameraService.zoomFactor),
@@ -1423,7 +1475,33 @@ struct CameraView: View {
                     rollDegrees: horizonService.rollDegrees
                 )
                 Task {
-                    let quality = await visionService.evaluateShotQuality(image: finalImage, targetPose: pinned)
+                    let quality = await visionService.evaluateShotQuality(image: hdrImage, targetPose: pinned)
+                    libraryStore.updateQualityScore(id: savedID, score: quality.totalScore)
+                }
+                if appState.autoSaveToApplePhotos, let latest = libraryStore.items.first {
+                    _ = await libraryStore.saveToApplePhotos(latest)
+                }
+                showToast("HDR+ (3 Kare) kaydedildi")
+            } else {
+                let (image, rawDNGData) = try await cameraService.capturePhotoWithRAW(preferRAW: isProMode)
+                let developedImage: UIImage
+                if let rawDNGData, !cameraService.isAppleProRAWSupported, appState.autoEnhancePhotos,
+                   let rawDeveloped = PhotoEnhancerService.developRAW(rawDNGData) {
+                    developedImage = rawDeveloped
+                } else {
+                    developedImage = appState.autoEnhancePhotos ? PhotoEnhancerService.naturalizeAndSharpen(image) : image
+                }
+                let pinned = appState.pinnedPose
+                let savedID = libraryStore.saveCapturedPhoto(
+                    developedImage,
+                    isGeneratedReference: false,
+                    poseIdea: pinned,
+                    zoomFactor: Double(cameraService.zoomFactor),
+                    overlayModeRaw: appState.overlayMode.rawValue,
+                    rollDegrees: horizonService.rollDegrees
+                )
+                Task {
+                    let quality = await visionService.evaluateShotQuality(image: developedImage, targetPose: pinned)
                     libraryStore.updateQualityScore(id: savedID, score: quality.totalScore)
                 }
                 var rawSaved = false
@@ -1433,7 +1511,8 @@ struct CameraView: View {
                 if appState.autoSaveToApplePhotos, let latest = libraryStore.items.first {
                     _ = await libraryStore.saveToApplePhotos(latest)
                 }
-                showToast(rawSaved ? "RAW (DNG) + Fotoğraf kaydedildi" : "Kütüphaneye kaydedildi")
+                let rawLabel = cameraService.isAppleProRAWSupported ? "ProRAW (DNG)" : "16-bit RAW (DNG)"
+                showToast(rawSaved ? "\(rawLabel) + Fotoğraf kaydedildi" : "Kütüphaneye kaydedildi")
             }
         } catch {
             showToast("Çekim başarısız")

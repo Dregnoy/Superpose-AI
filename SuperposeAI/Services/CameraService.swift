@@ -31,6 +31,8 @@ final class CameraService: NSObject {
     var isRecording = false
     var isRAWEnabled = false
     var isRAWSupported = false
+    var isAppleProRAWSupported = false
+    var isHDRBracketingEnabled = false
 
     @ObservationIgnored nonisolated private let sessionQueue = DispatchQueue(label: "com.superposelabs.camera.session")
     @ObservationIgnored nonisolated private let videoQueue = DispatchQueue(label: "com.superposelabs.camera.video")
@@ -48,6 +50,9 @@ final class CameraService: NSObject {
     @ObservationIgnored private var pendingProcessedImage: UIImage?
     @ObservationIgnored private var pendingRawDNGData: Data?
     @ObservationIgnored private var pendingPhotoError: Error?
+    @ObservationIgnored private var bracketContinuation: CheckedContinuation<UIImage, Error>?
+    @ObservationIgnored private var pendingBracketImages: [UIImage] = []
+    @ObservationIgnored private var expectedBracketCount: Int = 0
     @ObservationIgnored private var videoContinuation: CheckedContinuation<URL, Error>?
 
     var onVideoFrame: ((CVPixelBuffer) -> Void)?
@@ -412,17 +417,52 @@ final class CameraService: NSObject {
             sessionQueue.async { [weak self] in
                 guard let self else { return }
                 let settings: AVCapturePhotoSettings
-                if wantRAW, let rawFormat = self.photoOutput.availableRawPhotoPixelFormatTypes.first {
-                    settings = AVCapturePhotoSettings(
-                        rawPixelFormatType: rawFormat,
-                        processedFormat: [AVVideoCodecKey: AVVideoCodecType.jpeg]
-                    )
+                if wantRAW {
+                    let rawFormat = self.photoOutput.availableRawPhotoPixelFormatTypes.first(where: {
+                        AVCapturePhotoOutput.isAppleProRAWPixelFormat($0)
+                    }) ?? self.photoOutput.availableRawPhotoPixelFormatTypes.first
+                    if let rawFormat {
+                        settings = AVCapturePhotoSettings(
+                            rawPixelFormatType: rawFormat,
+                            processedFormat: [AVVideoCodecKey: AVVideoCodecType.jpeg]
+                        )
+                    } else {
+                        settings = AVCapturePhotoSettings()
+                    }
                 } else {
                     settings = AVCapturePhotoSettings()
                 }
                 if self.photoOutput.supportedFlashModes.contains(flash) {
                     settings.flashMode = flash
                 }
+                self.photoOutput.capturePhoto(with: settings, delegate: self)
+            }
+        }
+    }
+
+    /// Captures a 3-frame exposure bracket (-1 EV, 0 EV, +1 EV) and fuses them
+    /// on-device for high dynamic range on devices without Apple ProRAW.
+    func captureBracketedHDR() async throws -> UIImage {
+        pendingBracketImages = []
+        pendingPhotoError = nil
+        expectedBracketCount = min(3, max(1, photoOutput.maxBracketedCapturePhotoCount))
+        guard expectedBracketCount >= 2 else {
+            return try await capturePhoto()
+        }
+
+        return try await withCheckedThrowingContinuation { continuation in
+            self.bracketContinuation = continuation
+            sessionQueue.async { [weak self] in
+                guard let self else { return }
+                let biases: [Float] = [-1.0, 0.0, 1.0].prefix(self.expectedBracketCount).map { $0 }
+                let bracketSettings = biases.map {
+                    AVCaptureAutoExposureBracketedStillImageSettings.autoExposureSettings(exposureTargetBias: $0)
+                }
+                let settings = AVCapturePhotoBracketedStillImageSettings(
+                    rawPixelFormatType: 0,
+                    processedFormat: [AVVideoCodecKey: AVVideoCodecType.jpeg],
+                    bracketedSettings: bracketSettings
+                )
                 self.photoOutput.capturePhoto(with: settings, delegate: self)
             }
         }
@@ -491,9 +531,14 @@ final class CameraService: NSObject {
             session.addOutput(movieOutput)
         }
 
+        if photoOutput.isAppleProRAWSupported {
+            photoOutput.isAppleProRAWEnabled = true
+        }
         session.commitConfiguration()
+        let proRAWSupported = photoOutput.isAppleProRAWSupported
         let rawSupported = !photoOutput.availableRawPhotoPixelFormatTypes.isEmpty
         Task { @MainActor [weak self] in
+            self?.isAppleProRAWSupported = proRAWSupported
             self?.isRAWSupported = rawSupported
             if !rawSupported { self?.isRAWEnabled = false }
         }
@@ -527,6 +572,12 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
                 self.pendingPhotoError = error
                 return
             }
+            if self.expectedBracketCount > 0 {
+                if let data, let image = UIImage(data: data) {
+                    self.pendingBracketImages.append(image)
+                }
+                return
+            }
             if isRaw {
                 self.pendingRawDNGData = data
             } else if let data, let image = UIImage(data: data) {
@@ -542,6 +593,24 @@ extension CameraService: AVCapturePhotoCaptureDelegate {
     ) {
         Task { @MainActor [weak self] in
             guard let self else { return }
+            if self.expectedBracketCount > 0 {
+                let images = self.pendingBracketImages
+                let err = error ?? self.pendingPhotoError
+                let cont = self.bracketContinuation
+                self.pendingBracketImages = []
+                self.pendingPhotoError = nil
+                self.expectedBracketCount = 0
+                self.bracketContinuation = nil
+                if let err {
+                    cont?.resume(throwing: err)
+                } else if images.isEmpty {
+                    cont?.resume(throwing: CameraError.captureFailed)
+                } else {
+                    cont?.resume(returning: PhotoEnhancerService.fuseExposureBracket(images))
+                }
+                return
+            }
+
             defer {
                 self.pendingProcessedImage = nil
                 self.pendingRawDNGData = nil
