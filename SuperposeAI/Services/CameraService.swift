@@ -141,6 +141,11 @@ final class CameraService: NSObject, CameraServicing {
         sessionState.currentInput = input
         sessionState.isFocusLockedByUser = false
         enableContinuousAutoFocus(on: device)
+        if device.isGeometricDistortionCorrectionSupported {
+            try? device.lockForConfiguration()
+            device.isGeometricDistortionCorrectionEnabled = true
+            device.unlockForConfiguration()
+        }
 
         if sessionState.subjectAreaObserver == nil {
             sessionState.subjectAreaObserver = NotificationCenter.default.addObserver(

@@ -1,6 +1,7 @@
 import CoreImage
 import Metal
 import UIKit
+import Vision
 
 /// One-tap visual look presets for Simple Mode and post-capture styling.
 enum PhotoLookPreset: String, CaseIterable, Identifiable {
@@ -78,14 +79,23 @@ enum PhotoEnhancerService {
         return UIImage(cgImage: outputCG, scale: image.scale, orientation: image.imageOrientation)
     }
 
-    /// One-Tap Magic ("Tek Vuruşluk Büyü"): balances dynamic range, micro-contrast,
-    /// skin-safe vibrance, local clarity, luminance crispness, and a subtle studio vignette on-device.
+    /// One-Tap Magic ("Tek Vuruşluk Büyü"): filmic highlight roll-off, shadow denoise,
+    /// skin-safe vibrance, and halo-free micro-detail on Display P3 GPU.
     static func applyOneTapMagic(_ image: UIImage, lumaHint: Double = 0.5) -> UIImage {
         guard let cgImage = image.cgImage else { return image }
         var current = CIImage(cgImage: cgImage)
 
-        let shadowLift = lumaHint < 0.35 ? 0.36 : 0.28
-        let highlightProtect = lumaHint > 0.72 ? 0.82 : 0.88
+        // 1. Clean shadow chroma noise before any detail/contrast boost
+        if let denoise = CIFilter(name: "CINoiseReduction") {
+            denoise.setValue(current, forKey: kCIInputImageKey)
+            denoise.setValue(lumaHint < 0.35 ? 0.025 : 0.012, forKey: "inputNoiseLevel")
+            denoise.setValue(0.40, forKey: "inputSharpness")
+            if let out = denoise.outputImage { current = out }
+        }
+
+        // 2. Highlight protection + natural shadow recovery
+        let shadowLift = lumaHint < 0.35 ? 0.34 : 0.24
+        let highlightProtect = lumaHint > 0.72 ? 0.80 : 0.87
         if let shadowHighlight = CIFilter(name: "CIHighlightShadowAdjust") {
             shadowHighlight.setValue(current, forKey: kCIInputImageKey)
             shadowHighlight.setValue(shadowLift, forKey: "inputShadowAmount")
@@ -93,38 +103,30 @@ enum PhotoEnhancerService {
             if let out = shadowHighlight.outputImage { current = out }
         }
 
-        if let controls = CIFilter(name: "CIColorControls") {
-            controls.setValue(current, forKey: kCIInputImageKey)
-            controls.setValue(1.07, forKey: kCIInputContrastKey)
-            controls.setValue(lumaHint < 0.32 ? 0.03 : 0.0, forKey: kCIInputBrightnessKey)
-            if let out = controls.outputImage { current = out }
+        // 3. Subtle filmic S-curve for creamy highlights and rich midtone depth
+        if let toneCurve = CIFilter(name: "CIToneCurve") {
+            toneCurve.setValue(current, forKey: kCIInputImageKey)
+            toneCurve.setValue(CIVector(x: 0.0, y: 0.0), forKey: "inputPoint0")
+            toneCurve.setValue(CIVector(x: 0.25, y: 0.23), forKey: "inputPoint1")
+            toneCurve.setValue(CIVector(x: 0.50, y: 0.51), forKey: "inputPoint2")
+            toneCurve.setValue(CIVector(x: 0.75, y: 0.77), forKey: "inputPoint3")
+            toneCurve.setValue(CIVector(x: 1.0, y: 0.99), forKey: "inputPoint4")
+            if let out = toneCurve.outputImage { current = out }
         }
 
+        // 4. Skin-preserving natural color richness
         if let vibrance = CIFilter(name: "CIVibrance") {
             vibrance.setValue(current, forKey: kCIInputImageKey)
-            vibrance.setValue(0.16, forKey: "inputAmount")
+            vibrance.setValue(0.14, forKey: "inputAmount")
             if let out = vibrance.outputImage { current = out }
         }
 
-        // Local micro-contrast clarity (crisp texture in eyes, hair, fabric, and architecture)
+        // 5. Halo-free optical micro-detail
         if let unsharp = CIFilter(name: "CIUnsharpMask") {
             unsharp.setValue(current, forKey: kCIInputImageKey)
-            unsharp.setValue(2.2, forKey: kCIInputRadiusKey)
-            unsharp.setValue(0.45, forKey: kCIInputIntensityKey)
+            unsharp.setValue(1.4, forKey: kCIInputRadiusKey)
+            unsharp.setValue(0.28, forKey: kCIInputIntensityKey)
             if let out = unsharp.outputImage { current = out }
-        }
-
-        if let sharpen = CIFilter(name: "CISharpenLuminance") {
-            sharpen.setValue(current, forKey: kCIInputImageKey)
-            sharpen.setValue(0.38, forKey: kCIInputSharpnessKey)
-            if let out = sharpen.outputImage { current = out }
-        }
-
-        if let vignette = CIFilter(name: "CIVignette") {
-            vignette.setValue(current, forKey: kCIInputImageKey)
-            vignette.setValue(0.18, forKey: kCIInputIntensityKey)
-            vignette.setValue(1.8, forKey: kCIInputRadiusKey)
-            if let out = vignette.outputImage { current = out }
         }
 
         guard let outputCG = context.createCGImage(current, from: current.extent) else {
@@ -205,16 +207,34 @@ enum PhotoEnhancerService {
         guard let base = images.first else { return UIImage() }
         guard images.count > 1 else { return naturalizeAndSharpen(base) }
 
+        guard let referenceCG = base.cgImage else { return base }
         let ciImages = images.compactMap { img -> CIImage? in
             guard let cg = img.cgImage else { return nil }
             return CIImage(cgImage: cg)
         }
         guard var blended = ciImages.first else { return base }
+        let baseExtent = blended.extent
 
         for (index, nextImage) in ciImages.dropFirst().enumerated() {
+            var alignedNext = nextImage
+            if let nextCG = images.dropFirst().dropFirst(index).first?.cgImage {
+                let regRequest = VNTranslationalImageRegistrationRequest(targetedCGImage: nextCG)
+                let handler = VNImageRequestHandler(cgImage: referenceCG, options: [:])
+                if (try? handler.perform([regRequest])) != nil,
+                   let observation = regRequest.results?.first {
+                    let tx = observation.alignmentTransform.tx
+                    let ty = observation.alignmentTransform.ty
+                    if abs(tx) < baseExtent.width * 0.12 && abs(ty) < baseExtent.height * 0.12 {
+                        alignedNext = nextImage
+                            .transformed(by: CGAffineTransform(translationX: -tx, y: -ty))
+                            .cropped(to: baseExtent)
+                    }
+                }
+            }
+
             let alpha = CGFloat(1.0 / Double(index + 2))
             guard let alphaFilter = CIFilter(name: "CIColorMatrix") else { continue }
-            alphaFilter.setValue(nextImage, forKey: kCIInputImageKey)
+            alphaFilter.setValue(alignedNext, forKey: kCIInputImageKey)
             alphaFilter.setValue(CIVector(x: 0, y: 0, z: 0, w: alpha), forKey: "inputAVector")
             guard let weighted = alphaFilter.outputImage,
                   let composite = CIFilter(name: "CISourceOverCompositing") else { continue }
