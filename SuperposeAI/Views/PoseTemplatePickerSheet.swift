@@ -57,9 +57,10 @@ struct PoseTemplatePickerSheet: View {
                 RoundedRectangle(cornerRadius: 12)
                     .fill(Color.black.opacity(0.85))
                 PoseOverlayView(
-                    skeleton: pose.skeleton,
-                    secondarySkeleton: pose.secondarySkeleton,
-                    mode: .skeleton,
+                    targetSkeleton: pose.skeleton,
+                    secondaryTargetSkeleton: pose.secondarySkeleton,
+                    liveSkeleton: nil,
+                    mode: .fastSilhouette,
                     matchScore: nil
                 )
                 .padding(6)
