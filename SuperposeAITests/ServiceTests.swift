@@ -1,6 +1,7 @@
 import Testing
 import AVFoundation
 import Foundation
+import UIKit
 @testable import SuperposeAI
 
 @Suite("Service & State Tests")
