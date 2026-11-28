@@ -124,4 +124,12 @@ struct ServiceTests {
         let invalid = AIPoseGeneratorService.parseGeminiResponse(Data("not json".utf8))
         #expect(invalid.isEmpty)
     }
+
+    @Test("LiveGuidanceState initializes with haze and lead room defaults")
+    func liveGuidanceDefaults() {
+        let guidance = LiveGuidanceState()
+        #expect(guidance.hazeOrFlareWarning == false)
+        #expect(guidance.leadRoomHint == nil)
+        #expect(PoseVisionService.leadRoomHint(in: nil) == nil)
+    }
 }

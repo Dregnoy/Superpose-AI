@@ -246,7 +246,8 @@ struct CameraView: View {
 
             // Subtle Eye Blink, Background Line, Face Angle, Contrast, Shake & Couples Balance Alerts
             let showShakeAlert = horizonService.isShaking && (isProMode && manualShutter >= 0.04)
-            if visionService.guidance.eyesClosed || visionService.guidance.backgroundPoleWarning || visionService.guidance.couplesBalanceHint != nil || visionService.guidance.faceAngleHint != nil || visionService.guidance.subjectContrastHint != nil || showShakeAlert {
+            let showContrastEVButton = (visionService.guidance.lighting == .backlitOrHarsh || visionService.guidance.hazeOrFlareWarning) && exposureBias > -0.4
+            if visionService.guidance.eyesClosed || visionService.guidance.backgroundPoleWarning || visionService.guidance.hazeOrFlareWarning || visionService.guidance.couplesBalanceHint != nil || visionService.guidance.faceAngleHint != nil || visionService.guidance.leadRoomHint != nil || visionService.guidance.subjectContrastHint != nil || showShakeAlert || showContrastEVButton {
                 VStack(spacing: 6) {
                     Spacer().frame(height: 96)
                     if showShakeAlert {
@@ -256,6 +257,30 @@ struct CameraView: View {
                             .padding(.vertical, 5)
                             .background(Color.red.opacity(0.85), in: Capsule())
                             .foregroundStyle(.white)
+                            .allowsHitTesting(false)
+                    }
+                    if visionService.guidance.hazeOrFlareWarning {
+                        Label("Pus / Flare — Açıyı 10° değiştir", systemImage: "sun.haze.fill")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.orange.opacity(0.9), in: Capsule())
+                            .foregroundStyle(.black)
+                            .allowsHitTesting(false)
+                    }
+                    if showContrastEVButton {
+                        Button {
+                            exposureBias = -0.7
+                            cameraService.setExposureBias(-0.7)
+                            showToast("-0.7 EV kontrast koruması uygulandı")
+                        } label: {
+                            Label("-0.7 EV Kontrast Koru", systemImage: "minus.circle.fill")
+                                .font(.caption2.bold())
+                                .padding(.horizontal, 11)
+                                .padding(.vertical, 6)
+                                .background(Color.yellow, in: Capsule())
+                                .foregroundStyle(.black)
+                        }
                     }
                     if visionService.guidance.eyesClosed {
                         Label("Gözler Kapalı", systemImage: "eye.slash")
@@ -264,6 +289,7 @@ struct CameraView: View {
                             .padding(.vertical, 5)
                             .background(Color.orange.opacity(0.85), in: Capsule())
                             .foregroundStyle(.black)
+                            .allowsHitTesting(false)
                     }
                     if visionService.guidance.backgroundPoleWarning {
                         Label("Baş arkasında çizgi var", systemImage: "exclamationmark.triangle.fill")
@@ -272,6 +298,7 @@ struct CameraView: View {
                             .padding(.vertical, 5)
                             .background(Color.yellow.opacity(0.9), in: Capsule())
                             .foregroundStyle(.black)
+                            .allowsHitTesting(false)
                     }
                     if let contrastHint = visionService.guidance.subjectContrastHint {
                         Label(contrastHint, systemImage: "circle.lefthalf.filled")
@@ -280,6 +307,16 @@ struct CameraView: View {
                             .padding(.vertical, 5)
                             .background(Color.purple.opacity(0.85), in: Capsule())
                             .foregroundStyle(.white)
+                            .allowsHitTesting(false)
+                    }
+                    if let leadHint = visionService.guidance.leadRoomHint {
+                        Label(leadHint, systemImage: "arrow.left.and.right")
+                            .font(.caption2.bold())
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 5)
+                            .background(Color.cyan.opacity(0.9), in: Capsule())
+                            .foregroundStyle(.black)
+                            .allowsHitTesting(false)
                     }
                     if let faceHint = visionService.guidance.faceAngleHint {
                         Label(faceHint, systemImage: "face.smiling")
@@ -288,6 +325,7 @@ struct CameraView: View {
                             .padding(.vertical, 5)
                             .background(Color.mint.opacity(0.9), in: Capsule())
                             .foregroundStyle(.black)
+                            .allowsHitTesting(false)
                     }
                     if let hint = visionService.guidance.couplesBalanceHint {
                         Label(hint, systemImage: "person.2.fill")
@@ -296,10 +334,10 @@ struct CameraView: View {
                             .padding(.vertical, 5)
                             .background(Color.cyan.opacity(0.9), in: Capsule())
                             .foregroundStyle(.black)
+                            .allowsHitTesting(false)
                     }
                     Spacer()
                 }
-                .allowsHitTesting(false)
             }
 
             // Top & Bottom (or Trailing in Landscape) HUD

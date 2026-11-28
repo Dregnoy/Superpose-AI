@@ -107,7 +107,8 @@ extension CameraView {
                     _ = await libraryStore.saveToApplePhotos(latest)
                 }
                 let rawLabel = cameraService.isAppleProRAWSupported ? "ProRAW (DNG)" : "16-bit RAW (DNG)"
-                showToast(rawSaved ? "\(rawLabel) + Fotoğraf kaydedildi" : "Kütüphaneye kaydedildi")
+                let variationHint = cameraService.zoomFactor < 1.5 ? "Şimdi 2x yakın portre dene" : "Alçak açıdan bir kare daha dene"
+                showToast(rawSaved ? "\(rawLabel) kaydedildi · \(variationHint)" : "Kaydedildi · \(variationHint)")
             }
         } catch {
             showToast("Çekim başarısız")
@@ -289,6 +290,10 @@ extension CameraView {
     }
 
     func recordVideoClip() async {
+        cameraService.lockWhiteBalanceForVideo()
+        if visionService.guidance.lighting == .tooDark {
+            showToast("Loş ışık — temiz video için 24/30 fps önerilir")
+        }
         recordingSeconds = 0
         recordingTimerTask?.cancel()
         recordingTimerTask = Task {

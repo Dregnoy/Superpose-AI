@@ -113,6 +113,7 @@ final class PoseVisionService {
             let eyesClosed = faceRequest.map { Self.areEyesClosed(in: $0.results) } ?? prevGuidance.eyesClosed
             let rawSmile: Bool? = faceRequest.map { !eyesClosed && Self.isSmiling(in: $0.results) }
             let faceAngleHint = faceRequest.map { Self.faceAngleHint(in: $0.results) } ?? prevGuidance.faceAngleHint
+            let leadRoomHint = faceRequest.map { Self.leadRoomHint(in: $0.results) } ?? prevGuidance.leadRoomHint
             let faceBox: CGRect? = faceRequest.map { req in
                 req.results?.first.map { obs in
                     let b = obs.boundingBox
@@ -122,6 +123,7 @@ final class PoseVisionService {
             let couplesHint = Self.evaluateCouplesBalance(first: detectedSkeleton, second: detectedSecondary)
             let poleWarning = Self.detectVerticalLineBehindHead(in: pixelBuffer, nose: detectedSkeleton?.joints[.nose])
             let contrastDiff = abs(metrics.average - metrics.edgeAverage)
+            let hazeOrFlareWarning = metrics.average > 0.62 && contrastDiff < 0.08
             let subjectContrastHint: String? = (detectedSkeleton != nil && contrastDiff < 0.06)
                 ? "Arka plan karışık — Portre Bokeh dene"
                 : nil
@@ -152,8 +154,10 @@ final class PoseVisionService {
                     eyesClosed: eyesClosed,
                     isGoodSmile: isGoodSmile,
                     backgroundPoleWarning: poleWarning,
+                    hazeOrFlareWarning: hazeOrFlareWarning,
                     couplesBalanceHint: couplesHint,
                     faceAngleHint: faceAngleHint,
+                    leadRoomHint: leadRoomHint,
                     subjectContrastHint: subjectContrastHint,
                     detectedFaceBox: faceBox,
                     detectedSkeleton: detectedSkeleton,
@@ -327,6 +331,18 @@ final class PoseVisionService {
         }
         if let yaw = face.yaw?.doubleValue, abs(yaw) > 0.55 {
             return "Yüzünü biraz kameraya dön"
+        }
+        return nil
+    }
+
+    nonisolated static func leadRoomHint(in faces: [VNFaceObservation]?) -> String? {
+        guard let face = faces?.first, let yaw = face.yaw?.doubleValue else { return nil }
+        let midX = face.boundingBox.midX
+        if yaw < -0.25 && midX < 0.42 {
+            return "Baktığın yönde biraz boşluk bırak"
+        }
+        if yaw > 0.25 && midX > 0.58 {
+            return "Baktığın yönde biraz boşluk bırak"
         }
         return nil
     }

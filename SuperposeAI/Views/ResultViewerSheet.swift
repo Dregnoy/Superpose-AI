@@ -40,6 +40,7 @@ struct ResultViewerSheet: View {
     @State private var isApplyingBokeh = false
     @State private var isNaturalEnhanced = false
     @State private var isHorizonStraightened = false
+    @State private var manualTiltDegrees: Double = 0.0
     @State private var exposureAdjust: Double = 0.0
     @State private var warmthAdjust: Double = 0.0
     @State private var enhancedCache: UIImage?
@@ -199,7 +200,7 @@ struct ResultViewerSheet: View {
                         }
                     }
 
-                    DisclosureGroup("İnce Ayar (Işık / Sıcaklık)") {
+                    DisclosureGroup("İnce Ayar (Işık / Sıcaklık / Eğim)") {
                         VStack(spacing: 8) {
                             HStack(spacing: 8) {
                                 Text("Işık")
@@ -214,6 +215,19 @@ struct ResultViewerSheet: View {
                                     .frame(width: 54, alignment: .leading)
                                 Slider(value: $warmthAdjust, in: -1500...1500)
                                     .tint(.orange)
+                            }
+                            HStack(spacing: 8) {
+                                Text("Eğim")
+                                    .font(.caption2.bold())
+                                    .frame(width: 54, alignment: .leading)
+                                Slider(value: $manualTiltDegrees, in: -15...15, step: 0.5)
+                                    .tint(.green)
+                                Button(String(format: "%.0f°", manualTiltDegrees)) {
+                                    manualTiltDegrees = 0
+                                }
+                                .font(.caption2.monospacedDigit().bold())
+                                .foregroundStyle(.green)
+                                .frame(width: 34, alignment: .trailing)
                             }
                         }
                         .padding(.top, 4)
@@ -363,8 +377,9 @@ struct ResultViewerSheet: View {
             baseImage = enhancedCache ?? baseImage.map { PhotoEnhancerService.naturalizeAndSharpen($0) }
         }
         guard let base = baseImage else { return nil }
-        let straightenedBase = (isHorizonStraightened && item.rollDegrees != nil)
-            ? straightenHorizon(base, rollDegrees: item.rollDegrees ?? 0)
+        let totalTilt = (isHorizonStraightened ? (item.rollDegrees ?? 0) : 0) + manualTiltDegrees
+        let straightenedBase = abs(totalTilt) > 0.1
+            ? straightenHorizon(base, rollDegrees: totalTilt)
             : base
         let croppedBase = applyCenterCrop(straightenedBase, ratio: selectedCrop)
         let hasFineTune = abs(exposureAdjust) > 0.01 || abs(warmthAdjust) > 10

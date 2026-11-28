@@ -243,8 +243,10 @@ struct LiveGuidanceState: Equatable {
     var eyesClosed: Bool = false
     var isGoodSmile: Bool = false
     var backgroundPoleWarning: Bool = false
+    var hazeOrFlareWarning: Bool = false
     var couplesBalanceHint: String? = nil
     var faceAngleHint: String? = nil
+    var leadRoomHint: String? = nil
     var subjectContrastHint: String? = nil
     var detectedFaceBox: CGRect? = nil
     var detectedSkeleton: PoseSkeleton? = nil

@@ -303,6 +303,19 @@ final class CameraService: NSObject {
         }
     }
 
+    func lockWhiteBalanceForVideo() {
+        sessionQueue.async { [weak self] in
+            guard let self, let device = self.sessionState.currentInput?.device else { return }
+            do {
+                try device.lockForConfiguration()
+                if device.isWhiteBalanceModeSupported(.locked) {
+                    device.whiteBalanceMode = .locked
+                }
+                device.unlockForConfiguration()
+            } catch {}
+        }
+    }
+
     func resetProControls() {
         sessionQueue.async { [weak self] in
             guard let self, let device = self.sessionState.currentInput?.device else { return }
