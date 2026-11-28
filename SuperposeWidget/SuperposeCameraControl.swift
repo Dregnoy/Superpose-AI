@@ -5,6 +5,7 @@ import AppIntents
 @main
 struct SuperposeWidgetBundle: WidgetBundle {
     var body: some Widget {
+        DailyPoseWidget()
         SuperposeCameraControl()
     }
 }
