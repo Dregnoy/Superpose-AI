@@ -41,7 +41,7 @@ struct PoseTemplatePickerSheet: View {
         ScrollView(.horizontal, showsIndicators: false) {
             HStack(spacing: 8) {
                 categoryChip(title: "Tümü", category: nil)
-                ForEach(PoseCategory.allCases) { category in
+                ForEach(PoseCategory.allCases.filter { $0 != .all }) { category in
                     categoryChip(title: category.rawValue, category: category)
                 }
             }

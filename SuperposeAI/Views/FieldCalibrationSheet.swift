@@ -14,6 +14,7 @@ struct FieldCalibrationSheet: View {
         NavigationStack {
             Form {
                 Section("Termal & Performans Telemetrisi") {
+                    LabeledContent("Estetik Modeli", value: AestheticScoringService.isCoreMLModelAvailable ? "SuperposeAesthetic (CoreML)" : "Heuristik")
                     LabeledContent("Termal Durum", value: visionService.thermalStateLabel)
                     LabeledContent("Canlı Vision FPS", value: String(format: "%.1f fps", visionService.currentAnalysisFPS))
                     LabeledContent("Düşük Güç / Pil Tasarrufu", value: visionService.isPowerSavingActive ? "Aktif" : "Normal")

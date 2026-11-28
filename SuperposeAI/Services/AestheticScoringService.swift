@@ -31,6 +31,10 @@ struct AestheticScoreReport: Equatable, Sendable {
 enum AestheticScoringService {
     private static let sharedContext = PhotoEnhancerService.context
 
+    static var isCoreMLModelAvailable: Bool {
+        Bundle.main.url(forResource: "SuperposeAesthetic", withExtension: "mlmodelc") != nil
+    }
+
     static func evaluate(
         image: UIImage,
         poseMatchScore: Int? = nil,
@@ -78,9 +82,15 @@ enum AestheticScoringService {
               let imageFeature = try? MLFeatureValue(cgImage: resizedCG, pixelsWide: 224, pixelsHigh: 224, pixelFormatType: kCVPixelFormatType_32BGRA),
               let input = try? MLDictionaryFeatureProvider(dictionary: ["image": imageFeature]),
               let output = try? mlModel.prediction(from: input),
-              let score = output.featureValue(for: "aestheticScore")?.doubleValue else {
+              let fv = output.featureValue(for: "aestheticScore") else {
             return nil
         }
+        let score: Double = {
+            if let arr = fv.multiArrayValue, arr.count > 0 {
+                return arr[0].doubleValue
+            }
+            return fv.doubleValue
+        }()
         return score <= 1.0 ? score * 100.0 : score
     }
 

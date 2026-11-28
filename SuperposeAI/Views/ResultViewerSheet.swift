@@ -150,8 +150,13 @@ struct ResultViewerSheet: View {
                         .buttonStyle(.plain)
 
                         if let report = aestheticReport {
-                            Label("Estetik \(report.outOfTenText) • \(report.verdict)", systemImage: report.usedCoreMLModel ? "cpu" : "sparkles")
+                            Label(
+                                "\(report.usedCoreMLModel ? "CoreML Estetik" : "Estetik") \(report.outOfTenText) • \(report.verdict)",
+                                systemImage: report.usedCoreMLModel ? "cpu" : "sparkles"
+                            )
                                 .font(.caption2.bold())
+                                .lineLimit(1)
+                                .minimumScaleFactor(0.8)
                                 .padding(.horizontal, 10)
                                 .padding(.vertical, 7)
                                 .background(.ultraThinMaterial, in: Capsule())

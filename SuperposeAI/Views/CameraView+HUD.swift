@@ -91,6 +91,8 @@ extension CameraView {
         } label: {
             Text("PRO")
                 .font(.caption2.bold())
+                .lineLimit(1)
+                .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(isProMode ? .black : .white)
                 .padding(.horizontal, 9)
                 .padding(.vertical, 6)
@@ -527,6 +529,55 @@ extension CameraView {
                 }
             }
 
+            // Quick Creative Row (Pose Template + One-Tap Magic + Look)
+            if !isVideoMode {
+                HStack(spacing: 8) {
+                    Button {
+                        showPoseTemplates = true
+                    } label: {
+                        Label("Şablon", systemImage: "figure.stand")
+                            .font(.caption2.bold())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .foregroundStyle(appState.pinnedPose != nil ? .black : .white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(appState.pinnedPose != nil ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        isOneTapMagicEnabled.toggle()
+                        showToast(isOneTapMagicEnabled ? "Tek Vuruşluk Sihir açık" : "Tek Vuruşluk Sihir kapalı")
+                    } label: {
+                        Label("Sihir", systemImage: "wand.and.stars")
+                            .font(.caption2.bold())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .foregroundStyle(isOneTapMagicEnabled ? .black : .white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(isOneTapMagicEnabled ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+
+                    Button {
+                        selectedLook = selectedLook.next
+                        showToast("Stil: \(selectedLook.rawValue)")
+                    } label: {
+                        Text(selectedLook.rawValue)
+                            .font(.caption2.bold())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
+                            .foregroundStyle(selectedLook != .natural ? .black : .white)
+                            .padding(.horizontal, 10)
+                            .padding(.vertical, 6)
+                            .background(selectedLook != .natural ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
+                    }
+                    .buttonStyle(.plain)
+                }
+            }
+
             // Simple Mode: Flash + Foto/Video + Timer (+ Tools Drawer only in Pro Mode)
             HStack(spacing: 8) {
                 Button {
@@ -539,44 +590,6 @@ extension CameraView {
                         .background(.ultraThinMaterial, in: Circle())
                 }
                 .buttonStyle(.plain)
-
-                if !isVideoMode {
-                    Button {
-                        showPoseTemplates = true
-                    } label: {
-                        Image(systemName: "figure.stand")
-                            .font(.caption)
-                            .foregroundStyle(appState.pinnedPose != nil ? .black : .white)
-                            .frame(width: 32, height: 32)
-                            .background(appState.pinnedPose != nil ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        isOneTapMagicEnabled.toggle()
-                        showToast(isOneTapMagicEnabled ? "Tek Vuruşluk Sihir açık" : "Tek Vuruşluk Sihir kapalı")
-                    } label: {
-                        Image(systemName: "wand.and.stars")
-                            .font(.caption)
-                            .foregroundStyle(isOneTapMagicEnabled ? .black : .white)
-                            .frame(width: 32, height: 32)
-                            .background(isOneTapMagicEnabled ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Circle())
-                    }
-                    .buttonStyle(.plain)
-
-                    Button {
-                        selectedLook = selectedLook.next
-                        showToast("Stil: \(selectedLook.rawValue)")
-                    } label: {
-                        Text(selectedLook.rawValue)
-                            .font(.caption2.bold())
-                            .foregroundStyle(selectedLook != .natural ? .black : .white)
-                            .padding(.horizontal, 8)
-                            .padding(.vertical, 7)
-                            .background(selectedLook != .natural ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
-                    }
-                    .buttonStyle(.plain)
-                }
 
                 if isProMode {
                     Button {
@@ -594,6 +607,8 @@ extension CameraView {
                             }
                         }
                         .font(.caption2.bold())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(showToolsDrawer ? .black : .white)
                         .padding(.horizontal, 10)
                         .padding(.vertical, 7)
@@ -607,9 +622,11 @@ extension CameraView {
                         isVideoMode = false
                     } label: {
                         Text("FOTO")
-                            .font(.caption.bold())
+                            .font(.caption2.bold())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(!isVideoMode ? .black : .white)
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 12)
                             .padding(.vertical, 7)
                             .background(!isVideoMode ? AnyShapeStyle(Color.cyan) : AnyShapeStyle(Color.clear), in: Capsule())
                             .contentShape(Capsule())
@@ -620,9 +637,11 @@ extension CameraView {
                         isVideoMode = true
                     } label: {
                         Text("VİDEO")
-                            .font(.caption.bold())
+                            .font(.caption2.bold())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(isVideoMode ? .white : .white.opacity(0.85))
-                            .padding(.horizontal, 14)
+                            .padding(.horizontal, 12)
                             .padding(.vertical, 7)
                             .background(isVideoMode ? AnyShapeStyle(Color.red) : AnyShapeStyle(Color.clear), in: Capsule())
                             .contentShape(Capsule())
@@ -638,6 +657,8 @@ extension CameraView {
                     } label: {
                         Text(cameraService.is4KVideoEnabled ? "4K" : "HD")
                             .font(.caption2.bold())
+                            .lineLimit(1)
+                            .fixedSize(horizontal: true, vertical: false)
                             .foregroundStyle(cameraService.is4KVideoEnabled ? .black : .white)
                             .padding(.horizontal, 10)
                             .padding(.vertical, 7)
@@ -655,6 +676,8 @@ extension CameraView {
                             }
                         }
                         .font(.caption2.bold())
+                        .lineLimit(1)
+                        .fixedSize(horizontal: true, vertical: false)
                         .foregroundStyle(timerSeconds > 0 ? .black : .white)
                         .padding(.horizontal, timerSeconds > 0 ? 8 : 0)
                         .frame(minWidth: 32, minHeight: 32)
