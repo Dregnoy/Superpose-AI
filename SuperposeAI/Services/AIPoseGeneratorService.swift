@@ -95,7 +95,7 @@ struct AIPoseGeneratorService: PoseGenerating {
         return Self.parseGeminiResponse(data)
     }
 
-    private static func parseGeminiResponse(_ data: Data) -> [PoseIdea] {
+    static func parseGeminiResponse(_ data: Data) -> [PoseIdea] {
         struct GeminiEnvelope: Decodable {
             struct Candidate: Decodable {
                 struct Content: Decodable {
@@ -122,8 +122,17 @@ struct AIPoseGeneratorService: PoseGenerating {
         }
 
         guard let envelope = try? JSONDecoder().decode(GeminiEnvelope.self, from: data),
-              let rawText = envelope.candidates?.first?.content.parts.first?.text,
-              let jsonData = rawText.data(using: .utf8),
+              let rawText = envelope.candidates?.first?.content.parts.first?.text else {
+            return []
+        }
+
+        let cleanedText = rawText
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "```json", with: "")
+            .replacingOccurrences(of: "```", with: "")
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+
+        guard let jsonData = cleanedText.data(using: .utf8),
               let payload = try? JSONDecoder().decode(PosePayload.self, from: jsonData) else {
             return []
         }

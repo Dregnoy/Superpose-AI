@@ -99,4 +99,29 @@ struct ServiceTests {
         #expect(horizon.rollDegrees == 0.0)
         #expect(horizon.isShaking == false)
     }
+
+    @Test("AIPoseGeneratorService parses valid and markdown-fenced Gemini JSON responses")
+    func geminiResponseParsing() throws {
+        let innerJSON = """
+        ```json
+        {"poses":[{"title":"Kafe Işığı","angleLabel":"2x · Yan","confidenceTag":"Doğal","category":"Kafe","joints":{"nose":{"x":1.2,"y":-0.1},"neck":{"x":0.5,"y":0.28},"leftShoulder":{"x":0.4,"y":0.32},"rightShoulder":{"x":0.6,"y":0.32},"leftElbow":{"x":0.36,"y":0.44},"rightElbow":{"x":0.64,"y":0.44},"root":{"x":0.5,"y":0.55},"leftHip":{"x":0.43,"y":0.56}},"summary":"Sıcak pencere ışığı","subjectTips":["Çeneni hafif kaldır"],"photographerTips":["2x lens kullan"]}]}
+        ```
+        """
+        let envelope: [String: Any] = [
+            "candidates": [
+                ["content": ["parts": [["text": innerJSON]]]]
+            ]
+        ]
+        let data = try JSONSerialization.data(withJSONObject: envelope)
+        let poses = AIPoseGeneratorService.parseGeminiResponse(data)
+
+        #expect(poses.count == 1)
+        #expect(poses.first?.title == "Kafe Işığı")
+        #expect(poses.first?.category == .cafe)
+        #expect(poses.first?.skeleton.joints[.nose]?.x == 0.95)
+        #expect(poses.first?.skeleton.joints[.nose]?.y == 0.05)
+
+        let invalid = AIPoseGeneratorService.parseGeminiResponse(Data("not json".utf8))
+        #expect(invalid.isEmpty)
+    }
 }
