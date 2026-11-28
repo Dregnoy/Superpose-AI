@@ -153,7 +153,7 @@ struct ServiceTests {
             from: nil,
             sceneTags: ["cafe"],
             lighting: .tooDark,
-            useCase: .portrait
+            useCase: .dating
         )
         #expect(poses.count == 4)
         #expect(poses.first?.confidenceTag == "Çevrimdışı AI")
