@@ -75,4 +75,28 @@ struct ServiceTests {
         let decodedScored = try JSONDecoder().decode(LibraryItem.self, from: encoded)
         #expect(decodedScored.qualityScore == 91.2)
     }
+
+    @Test("AIPoseGeneratorService returns valid 4-pose packs across all use cases")
+    func aiPoseGeneratorAllUseCases() async throws {
+        let generator = AIPoseGeneratorService()
+        for useCase in PoseUseCase.allCases {
+            let poses = try await generator.generatePosePack(
+                from: nil,
+                sceneTags: ["outdoor", "cafe"],
+                lighting: .good,
+                useCase: useCase,
+                apiKey: ""
+            )
+            #expect(poses.count == 4)
+            #expect(poses.allSatisfy { !$0.title.isEmpty && !$0.skeleton.joints.isEmpty })
+        }
+    }
+
+    @Test("HorizonLevelService defaults to level and non-shaking")
+    @MainActor
+    func horizonLevelInitialState() {
+        let horizon = HorizonLevelService()
+        #expect(horizon.rollDegrees == 0.0)
+        #expect(horizon.isShaking == false)
+    }
 }

@@ -229,16 +229,29 @@ extension CameraView {
         autoShutterTask?.cancel()
         autoShutterTask = Task {
             for remaining in stride(from: seconds, through: 1, by: -1) {
-                guard !Task.isCancelled else { return }
+                guard !Task.isCancelled else {
+                    LiveActivityManager.shared.end()
+                    return
+                }
                 autoShutterCountdown = remaining
+                LiveActivityManager.shared.startOrUpdate(
+                    modeTitle: "Zamanlayıcı",
+                    detailText: "Çekime hazırlanılıyor…",
+                    countdownSeconds: remaining,
+                    matchScore: visionService.guidance.poseMatchScore
+                )
                 if remaining <= 3 && !appState.isSilentModeEnabled {
                     voiceCoach.speak("\(remaining)", fast: appState.voiceCoachFast)
                 }
                 try? await Task.sleep(for: .seconds(1))
             }
-            guard !Task.isCancelled else { return }
+            guard !Task.isCancelled else {
+                LiveActivityManager.shared.end()
+                return
+            }
             autoShutterCountdown = nil
             autoShutterTask = nil
+            LiveActivityManager.shared.end()
             await captureAndSavePhoto()
         }
     }
@@ -247,16 +260,29 @@ extension CameraView {
         if let existing = intervalTask {
             existing.cancel()
             intervalTask = nil
+            LiveActivityManager.shared.end()
             showToast("Aralıklı çekim durduruldu (\(intervalShotsCount) kare)")
             return
         }
         intervalShotsCount = 0
         let step = intervalSeconds
         showToast("Aralıklı çekim başladı (Her \(step) sn)")
+        LiveActivityManager.shared.startOrUpdate(
+            modeTitle: "Aralıklı Çekim",
+            detailText: "Her \(step) saniyede bir kare",
+            shotCount: 0,
+            matchScore: visionService.guidance.poseMatchScore
+        )
         intervalTask = Task {
             while !Task.isCancelled {
                 await captureAndSavePhoto()
                 intervalShotsCount += 1
+                LiveActivityManager.shared.startOrUpdate(
+                    modeTitle: "Aralıklı Çekim",
+                    detailText: "Her \(step) saniyede bir kare",
+                    shotCount: intervalShotsCount,
+                    matchScore: visionService.guidance.poseMatchScore
+                )
                 try? await Task.sleep(for: .seconds(step))
             }
         }

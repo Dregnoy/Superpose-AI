@@ -7,6 +7,7 @@ struct SuperposeWidgetBundle: WidgetBundle {
     var body: some Widget {
         DailyPoseWidget()
         SuperposeCameraControl()
+        SuperposeShootLiveActivity()
     }
 }
 

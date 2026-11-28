@@ -22,6 +22,7 @@ targets:
         excludes:
           - Resources/Products.storekit
           - App/Info.plist
+      - path: SuperposeShared
     resources:
       - path: SuperposeAI/Resources/Products.storekit
     settings:
@@ -35,6 +36,7 @@ targets:
         INFOPLIST_KEY_NSPhotoLibraryAddUsageDescription: "Superpose needs permission to save your captured photos to your Photo Library."
         INFOPLIST_KEY_NSPhotoLibraryUsageDescription: "Superpose needs photo library access so you can import a photo to generate pose ideas."
         INFOPLIST_KEY_UILaunchScreen_Generation: YES
+        INFOPLIST_KEY_NSSupportsLiveActivities: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
@@ -47,6 +49,7 @@ targets:
       - path: SuperposeWidget
         excludes:
           - Info.plist
+      - path: SuperposeShared
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: com.superposelabs.superpose.widget
