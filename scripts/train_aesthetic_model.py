@@ -98,15 +98,28 @@ def train_model(data_dir: Path, epochs: int, batch_size: int, lr: float) -> Supe
     )
 
     dataset = AestheticFolderDataset(data_dir, transform=transform)
-    loader = DataLoader(dataset, batch_size=batch_size, shuffle=True, num_workers=0)
-    print(f"Loaded {len(dataset)} images.")
+    val_size = max(1, int(len(dataset) * 0.15)) if len(dataset) >= 10 else 0
+    train_size = len(dataset) - val_size
+    if val_size > 0:
+        train_ds, val_ds = torch.utils.data.random_split(
+            dataset, [train_size, val_size], generator=torch.Generator().manual_seed(42)
+        )
+        val_loader = DataLoader(val_ds, batch_size=batch_size, shuffle=False, num_workers=0)
+    else:
+        train_ds = dataset
+        val_loader = None
+
+    loader = DataLoader(train_ds, batch_size=batch_size, shuffle=True, num_workers=0)
+    print(f"Loaded {len(dataset)} images (train={train_size}, val={val_size}).")
 
     model = SuperposeAestheticNet().to(device)
     optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=1e-4)
     criterion = nn.SmoothL1Loss()
 
-    model.train()
+    best_val = float("inf")
+    best_state = None
     for epoch in range(1, epochs + 1):
+        model.train()
         running_loss = 0.0
         for images, targets in loader:
             images = images.to(device)
@@ -120,9 +133,24 @@ def train_model(data_dir: Path, epochs: int, batch_size: int, lr: float) -> Supe
 
             running_loss += loss.item() * images.size(0)
 
-        avg_loss = running_loss / len(dataset)
-        print(f"Epoch {epoch:02d}/{epochs:02d} - loss: {avg_loss:.4f}")
+        avg_loss = running_loss / max(1, train_size)
+        if val_loader is not None:
+            model.eval()
+            val_loss = 0.0
+            with torch.no_grad():
+                for images, targets in val_loader:
+                    preds = model(images.to(device))
+                    val_loss += criterion(preds, targets.to(device)).item() * images.size(0)
+            avg_val = val_loss / val_size
+            if avg_val < best_val:
+                best_val = avg_val
+                best_state = {k: v.cpu().clone() for k, v in model.state_dict().items()}
+            print(f"Epoch {epoch:02d}/{epochs:02d} - train_loss: {avg_loss:.4f} - val_loss: {avg_val:.4f}")
+        else:
+            print(f"Epoch {epoch:02d}/{epochs:02d} - train_loss: {avg_loss:.4f}")
 
+    if best_state is not None:
+        model.load_state_dict(best_state)
     return model.cpu().eval()
 
 

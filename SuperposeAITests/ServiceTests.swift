@@ -207,4 +207,17 @@ struct ServiceTests {
         let watch = WatchRemoteService()
         #expect(watch.isWatchReachable == false)
     }
+
+    @Test("SharedPoseImportStore saves and consumes shared reference image")
+    func sharedPoseImportLifecycle() throws {
+        let renderer = UIGraphicsImageRenderer(size: CGSize(width: 32, height: 32))
+        let img = renderer.image { ctx in
+            UIColor.systemCyan.setFill()
+            ctx.fill(CGRect(x: 0, y: 0, width: 32, height: 32))
+        }
+        #expect(SharedPoseImportStore.saveSharedImage(img) == true)
+        let consumed = try #require(SharedPoseImportStore.consumeSharedImage())
+        #expect(consumed.size.width > 0)
+        #expect(SharedPoseImportStore.consumeSharedImage() == nil)
+    }
 }

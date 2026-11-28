@@ -39,9 +39,32 @@ targets:
         INFOPLIST_KEY_NSSupportsLiveActivities: YES
         INFOPLIST_KEY_UISupportedInterfaceOrientations_iPhone: "UIInterfaceOrientationPortrait UIInterfaceOrientationLandscapeLeft UIInterfaceOrientationLandscapeRight"
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    info:
+      path: SuperposeAI/Info-Generated.plist
+      properties:
+        CFBundleURLTypes:
+          - CFBundleURLName: com.superposelabs.superpose
+            CFBundleURLSchemes:
+              - superpose
     dependencies:
       - target: SuperposeWidgetExtension
         embed: true
+      - target: SuperposeShareExtension
+        embed: true
+  SuperposeShareExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: SuperposeShare
+        excludes:
+          - Info.plist
+      - path: SuperposeShared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.superposelabs.superpose.share
+        GENERATE_INFOPLIST_FILE: NO
+        INFOPLIST_FILE: SuperposeShare/Info.plist
+        SKIP_INSTALL: YES
   SuperposeWidgetExtension:
     type: app-extension
     platform: iOS
