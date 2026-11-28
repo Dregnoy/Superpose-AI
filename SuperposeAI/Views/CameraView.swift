@@ -50,6 +50,8 @@ struct CameraView: View {
     @State var showPoseTemplates: Bool = false
     @State var selectedLook: PhotoLookPreset = .natural
     @State var isOneTapMagicEnabled: Bool = true
+    @State var showCalibrationSheet: Bool = false
+    @State var watchRemote = WatchRemoteService()
 
     let poseGenerator = AIPoseGeneratorService()
 
@@ -442,6 +444,14 @@ struct CameraView: View {
                 }
             }
             volumeShutter.start()
+            watchRemote.start { timer in
+                guard !isGeneratingPoses else { return }
+                if timer > 0 {
+                    startManualTimerCapture(seconds: timer)
+                } else {
+                    Task { await captureAndSavePhoto() }
+                }
+            }
             let granted = await cameraService.checkAndRequestPermission()
             if granted {
                 cameraService.onVideoFrame = { buffer in
@@ -474,6 +484,13 @@ struct CameraView: View {
             }
             evaluateAutoShutter(with: newGuidance)
             evaluateMatchHaptic(with: newGuidance)
+            watchRemote.sendLiveStatus(
+                matchScore: newGuidance.poseMatchScore,
+                lightingMessage: newGuidance.lighting.message,
+                isShotReady: isShotReady,
+                isRecording: cameraService.isRecording,
+                threshold: appState.poseMatchThreshold
+            )
         }
         .onChange(of: appState.isSilentModeEnabled) { _, silent in
             if silent {
@@ -510,6 +527,9 @@ struct CameraView: View {
         }
         .sheet(isPresented: $showPoseTemplates) {
             PoseTemplatePickerSheet()
+        }
+        .sheet(isPresented: $showCalibrationSheet) {
+            FieldCalibrationSheet(visionService: visionService, cameraService: cameraService)
         }
         .onChange(of: appState.pendingCameraTip) { _, tip in
             if let tip {

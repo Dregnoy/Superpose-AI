@@ -171,7 +171,7 @@ extension CameraView {
             && guidance.lighting == .good
             && guidance.framing == .great
             && !guidance.eyesClosed
-            && (guidance.poseMatchScore ?? 0) >= 85
+            && (guidance.poseMatchScore ?? 0) >= appState.poseMatchThreshold
 
         let smileReady = appState.isSmileShutterEnabled
             && guidance.isGoodSmile
@@ -211,7 +211,7 @@ extension CameraView {
             didVibrateForCurrentMatch = false
             return
         }
-        if score >= 85 && !didVibrateForCurrentMatch {
+        if score >= appState.poseMatchThreshold && !didVibrateForCurrentMatch {
             didVibrateForCurrentMatch = true
             UINotificationFeedbackGenerator().notificationOccurred(.success)
             if !appState.isSilentModeEnabled {

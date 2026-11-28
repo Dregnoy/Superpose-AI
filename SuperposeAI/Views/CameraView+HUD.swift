@@ -486,6 +486,16 @@ extension CameraView {
                             .frame(height: 34)
                             .background(isProMode ? AnyShapeStyle(Color.yellow) : AnyShapeStyle(.ultraThinMaterial), in: Capsule())
                     }
+
+                    Button {
+                        showCalibrationSheet = true
+                    } label: {
+                        Image(systemName: "gauge.with.dots.needle.bottom.50percent")
+                            .font(.subheadline)
+                            .foregroundStyle(.cyan)
+                            .frame(width: 34, height: 34)
+                            .background(.ultraThinMaterial, in: Circle())
+                    }
                 }
                 }
                 .padding(.horizontal, 2)
@@ -701,7 +711,7 @@ extension CameraView {
                         if appState.pinnedPose != nil, let matchScore = visionService.guidance.poseMatchScore, !isVideoMode {
                             Circle()
                                 .trim(from: 0, to: CGFloat(min(100, max(0, matchScore))) / 100.0)
-                                .stroke(matchScore >= 85 ? Color.green : Color.cyan, style: StrokeStyle(lineWidth: 5, lineCap: .round))
+                                .stroke(matchScore >= appState.poseMatchThreshold ? Color.green : Color.cyan, style: StrokeStyle(lineWidth: 5, lineCap: .round))
                                 .rotationEffect(.degrees(-90))
                                 .frame(width: 72, height: 72)
                                 .animation(.easeOut(duration: 0.18), value: matchScore)

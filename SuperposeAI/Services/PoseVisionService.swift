@@ -11,6 +11,16 @@ import Foundation
 final class PoseVisionService {
     var guidance = LiveGuidanceState()
     var focusPeakingImage: UIImage? = nil
+    private(set) var currentAnalysisFPS: Double = 0
+    var thermalStateLabel: String {
+        switch ProcessInfo.processInfo.thermalState {
+        case .nominal: return "Nominal"
+        case .fair: return "Ilık"
+        case .serious: return "Yüksek"
+        case .critical: return "Kritik"
+        @unknown default: return "Bilinmiyor"
+        }
+    }
     var isPowerSavingActive: Bool {
         let lowBattery = UIDevice.current.batteryLevel >= 0 && UIDevice.current.batteryLevel <= 0.20
         return lowBattery || ProcessInfo.processInfo.isLowPowerModeEnabled
@@ -52,6 +62,11 @@ final class PoseVisionService {
         }
 
         isProcessing = true
+        let delta = now - lastProcessedTime
+        if delta > 0 && delta < 5.0 {
+            let instantFPS = 1.0 / delta
+            currentAnalysisFPS = currentAnalysisFPS == 0 ? instantFPS : (currentAnalysisFPS * 0.7 + instantFPS * 0.3)
+        }
         lastProcessedTime = now
 
         let metrics = Self.estimateLightingMetrics(from: pixelBuffer)

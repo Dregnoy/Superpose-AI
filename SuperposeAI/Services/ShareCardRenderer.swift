@@ -88,19 +88,8 @@ enum ShareCardRenderer {
             ]
             let titleSize = (titleText as NSString).size(withAttributes: titleAttrs)
             (titleText as NSString).draw(
-                at: CGPoint(x: (canvasSize.width - titleSize.width) / 2, y: 1580),
+                at: CGPoint(x: (canvasSize.width - titleSize.width) / 2, y: 1600),
                 withAttributes: titleAttrs
-            )
-
-            let brandText = "Superpose AI ile çekildi"
-            let brandAttrs: [NSAttributedString.Key: Any] = [
-                .font: UIFont.systemFont(ofSize: 28, weight: .medium),
-                .foregroundColor: UIColor.white.withAlphaComponent(0.65)
-            ]
-            let brandSize = (brandText as NSString).size(withAttributes: brandAttrs)
-            (brandText as NSString).draw(
-                at: CGPoint(x: (canvasSize.width - brandSize.width) / 2, y: 1650),
-                withAttributes: brandAttrs
             )
         }
     }

@@ -74,6 +74,21 @@ final class AppState {
             UserDefaults.standard.set(isOneHandedMode, forKey: "isOneHandedMode")
         }
     }
+    var poseMatchThreshold: Int {
+        didSet {
+            let clamped = max(65, min(95, poseMatchThreshold))
+            if clamped != poseMatchThreshold {
+                poseMatchThreshold = clamped
+                return
+            }
+            UserDefaults.standard.set(poseMatchThreshold, forKey: "poseMatchThreshold")
+        }
+    }
+    var lowLightBoostEnabled: Bool {
+        didSet {
+            UserDefaults.standard.set(lowLightBoostEnabled, forKey: "lowLightBoostEnabled")
+        }
+    }
     var pendingCameraTip: String? = nil
     var requestedZoomFactor: Double? = nil
     var latestGeneratedPoses: [PoseIdea] = []
@@ -123,6 +138,13 @@ final class AppState {
         self.isSmileShutterEnabled = UserDefaults.standard.bool(forKey: "isSmileShutterEnabled")
         self.isSilentModeEnabled = UserDefaults.standard.bool(forKey: "isSilentModeEnabled")
         self.isOneHandedMode = UserDefaults.standard.bool(forKey: "isOneHandedMode")
+        let savedThreshold = UserDefaults.standard.integer(forKey: "poseMatchThreshold")
+        self.poseMatchThreshold = savedThreshold > 0 ? max(65, min(95, savedThreshold)) : 85
+        if UserDefaults.standard.object(forKey: "lowLightBoostEnabled") == nil {
+            self.lowLightBoostEnabled = true
+        } else {
+            self.lowLightBoostEnabled = UserDefaults.standard.bool(forKey: "lowLightBoostEnabled")
+        }
         self.geminiAPIKey = KeychainHelper.loadAPIKey()
         if let data = UserDefaults.standard.data(forKey: "savedCustomPoses"),
            let decoded = try? JSONDecoder().decode([PoseIdea].self, from: data) {

@@ -189,4 +189,22 @@ struct ServiceTests {
         #expect(metrics.totalShotsCaptured == 0)
         defaults.removePersistentDomain(forName: suiteName)
     }
+
+    @Test("AppState poseMatchThreshold clamps between 65 and 95 and WatchRemoteService initializes")
+    @MainActor
+    func calibrationAndWatchService() {
+        let state = AppState()
+        let previous = state.poseMatchThreshold
+        state.poseMatchThreshold = 40
+        #expect(state.poseMatchThreshold == 65)
+        state.poseMatchThreshold = 110
+        #expect(state.poseMatchThreshold == 95)
+        state.poseMatchThreshold = previous
+
+        let vision = PoseVisionService()
+        #expect(!vision.thermalStateLabel.isEmpty)
+
+        let watch = WatchRemoteService()
+        #expect(watch.isWatchReachable == false)
+    }
 }
